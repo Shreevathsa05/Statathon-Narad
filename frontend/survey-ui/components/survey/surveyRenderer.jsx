@@ -1,8 +1,8 @@
 "use client";
 
-import DynamicField from "./DynamicField";
-import { shouldShowField } from "./ConditionEvaluator";
 import { useState } from "react";
+import DynamicField from "@/components/survey/DynamicField";
+import { shouldShowField } from "@/components/survey/ConditionEvaluator";
 
 export default function SurveyRenderer({ schema }) {
   const [answers, setAnswers] = useState({});
@@ -12,7 +12,7 @@ export default function SurveyRenderer({ schema }) {
   };
 
   return (
-    <>
+    <div>
       {schema.map((field) =>
         shouldShowField(field, answers) ? (
           <DynamicField
@@ -23,6 +23,8 @@ export default function SurveyRenderer({ schema }) {
           />
         ) : null
       )}
-    </>
+
+      <button onClick={() => console.log(answers)}>Submit</button>
+    </div>
   );
 }
