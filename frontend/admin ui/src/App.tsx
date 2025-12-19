@@ -1,22 +1,40 @@
-import {HashRouter as Router, Routes, Route, Link} from 'react-router'
-function App() {
+import React from "react";
+import { HashRouter, Routes, Route } from "react-router-dom";
 
+import GeneratorValidator from "./pages/Generator_validator";
+import QuestionReview from "./pages/QuestionReview";
+import FinalSurveyView from "./pages/FinalSurveyView";
+
+function App() {
   return (
-    <>
-    <Router>
-      <nav>
-        <Link to='/'>Home</Link>
-        <Link to='/a'>A</Link>
-        <Link to='/b'>B</Link>
-      </nav>
+    <HashRouter>
       <Routes>
-        <Route path='/' element={<>Home / List of surveys with links to dashboard</>} />
-        <Route path='/a' element={<>Survey Generator / Question validator</>} />
-        <Route path='/b' element={<>Publish / dashboard</>} />
+        <Route
+          path="/"
+          element={<div>Home / List of surveys</div>}
+          
+        />
+
+        {/* Survey Generator */}
+        <Route
+          path="/a"
+          element={<GeneratorValidator />}
+        />
+
+        {/* Question Approval */}
+        <Route
+          path="/question-review"
+          element={<QuestionReview />}
+        />
+
+        {/* Final Survey */}
+        <Route
+          path="/final-survey"
+          element={<FinalSurveyView />}
+        />
       </Routes>
-    </Router>
-    </>
-  )
+    </HashRouter>
+  );
 }
 
-export default App
+export default App;

@@ -4,22 +4,32 @@ logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
+# Dependency directories
+node_modules/
+# Build output
+dist/
+build/
+# Environment variables
+env
+env.local
+env.*.local
+# Editor and system files
+DS_Store
+Thumbs.db
+vscode/
+idea/
+# Test coverage reports
+coverage/
+# Temporary files
+*.tmp
+*.swp
+# Package lock files (optional, depending on your workflow)
 package-lock.json
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+yarn.lock
+# Optional npm debug files
+npmrc
+# Ignore compiled TypeScript files (if applicable)
+*.tsbuildinfo
+# Ignore local npm link directories (if used)
+npm/
+.env
