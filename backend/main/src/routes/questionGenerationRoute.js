@@ -7,14 +7,15 @@ const questionGenerationRouter = Router();
 questionGenerationRouter.get("/", async (req, res) => {
     res.json("Working questionGenerationRoute");
 });
-questionGenerationRouter.get("/languages_supported", async (req, res) => {
-    res.send(await AllLanguages);
+questionGenerationRouter.get("/languages_supported", (req, res) => {
+    res.send(AllLanguages);
 });
 
 questionGenerationRouter.get("/test", async (req, res) => {
     let ans;
     try {
-        ans = await generateQuestionsForType1("get details on house owners and responsibilty awareness", "mixed", "null", "15 questions", "Suburban", ['hindi','english','marathi','kannada']);
+        ans = await generateQuestionsForType1("get details on house owners and responsibilty awareness", "mixed", "null", "5 questions", "Suburban", ['hindi','english','marathi','kannada']);
+        console.log(ans);
     } catch (error) {
         ans=error
     }
@@ -22,7 +23,7 @@ questionGenerationRouter.get("/test", async (req, res) => {
     res.send(ans);
 });
 
-questionGenerationRouter.get("/type1", async (req, res) => {
+questionGenerationRouter.post("/type1", async (req, res) => {
 
     let {surveyObjective, householdType, recallPeriod, surveyLength, region, languages}=req.body;
 
@@ -36,7 +37,7 @@ questionGenerationRouter.get("/type1", async (req, res) => {
     res.send(ans);
 });
 
-questionGenerationRouter.get("/type2", async (req, res) => {
+questionGenerationRouter.post("/type2", async (req, res) => {
 
     let {surveyObjective, ageGroup, referencePeriod, sectorFocus, questionDepth, validationStrictness, interviewMode, languages}=req.body;
 
@@ -49,7 +50,7 @@ questionGenerationRouter.get("/type2", async (req, res) => {
     // console.log(ans)
     res.send(ans);
 });
-questionGenerationRouter.get("/type3", async (req, res) => {
+questionGenerationRouter.post("/type3", async (req, res) => {
 
     let {assetCoverage, debtType, referencePeriod, sensitivityLevel, validationMode, privacyMode, languages}=req.body;
 
@@ -62,7 +63,7 @@ questionGenerationRouter.get("/type3", async (req, res) => {
     // console.log(ans)
     res.send(ans);
 });
-questionGenerationRouter.get("/type4", async (req, res) => {
+questionGenerationRouter.post("/type4", async (req, res) => {
 
     let {enterpriseType, registrationStatus, industryClassification, enterpriseSize, accountingPeriod, dataSourceType, validationStrictness, languages}=req.body;
 
