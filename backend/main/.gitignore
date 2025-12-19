@@ -32,3 +32,4 @@ npmrc
 *.tsbuildinfo
 # Ignore local npm link directories (if used)
 npm/
+.env
