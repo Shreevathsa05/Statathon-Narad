@@ -68,7 +68,10 @@ const OptionSchema = new Schema(
 
 const QuestionSchema = new Schema(
     {
-        qid: { type: String, required: true },
+        qid: {
+            type: String,
+            required: true
+        },
 
         type: {
             type: String,
@@ -102,8 +105,13 @@ export const SurveySchema = new Schema(
             type: String,
             required: true,
             index: true,
+            unique: true
         },
-
+        name: {
+            type: String,
+            required: true,
+            trim: true
+        },
         status: {
             type: String,
             enum: ["waiting", "approved", "active", "complete"],
@@ -136,7 +144,6 @@ export const SurveySchema = new Schema(
             type: [String],
             required: true,
         },
-
         createdBy: {
             type: String,
             required: true,
@@ -152,6 +159,4 @@ export const SurveySchema = new Schema(
 /* Model                              */
 /* ---------------------------------- */
 
-export const SurveyModel =
-    mongoose.models.Survey ||
-    mongoose.model("Survey", SurveySchema);
+export const Survey = mongoose.model("Survey", SurveySchema);
