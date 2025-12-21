@@ -57,10 +57,18 @@ const ShowIfSchema = new Schema(
 const OptionSchema = new Schema(
     {
         id: { type: String, required: true },
-        label: { type: LocalizedTextSchema, required: true },
+        label: {
+            type: Map,
+            of: {
+                type: String,
+                minlength: 1
+            },
+            required: true
+        }
     },
     { _id: false }
 );
+
 
 /* ---------------------------------- */
 /* Question                           */
@@ -75,20 +83,35 @@ const QuestionSchema = new Schema(
 
         type: {
             type: String,
-            enum: ["mcq"],
+            enum: ["mcq", "text", "checkbox", "number"],
             required: true,
         },
 
-        text: { type: LocalizedTextSchema, required: true },
+        text: {
+            type: Map,
+            of: {
+                type: String,
+                minlength: 1
+            },
+            required: true
+        },
 
         options: {
             type: [OptionSchema],
-            required: true,
+            required: function () {
+                return this.type === "mcq" || this.type === "checkbox";
+            },
             validate: {
-                validator: (v) => Array.isArray(v) && v.length >= 2 && v.length <= 5,
-                message: "MCQ must have between 2 and 5 options",
+                validator: function (v) {
+                    if (this.type === "mcq" || this.type === "checkbox") {
+                        return Array.isArray(v) && v.length >= 2 && v.length <= 5;
+                    }
+                    return true; 
+                },
+                message: "MCQ/Checkbox must have between 2 and 5 options",
             },
         },
+
 
         showIf: { type: ShowIfSchema, required: false },
     },
