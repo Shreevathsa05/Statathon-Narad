@@ -28,7 +28,6 @@ export const paraInfoSchema = new Schema(
             },
             coordinates: {
                 type: [Number], // [longitude, latitude]
-                required: true
             },
             accuracyMeters: Number
         },
@@ -40,7 +39,6 @@ export const paraInfoSchema = new Schema(
             interviewMode: {
                 type: String,
                 enum: ["CAPI", "CATI", "CAWI"],
-                required: true
             }
         }
     },
