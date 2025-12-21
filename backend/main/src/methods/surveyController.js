@@ -23,6 +23,7 @@ export const getSurveyById = asyncHandler(async (req, res) => {
 
 export const createSurvey = asyncHandler(async (req, res) => {
     const {
+        surveyId,
         name,
         status,
         supportedLanguages,
@@ -31,8 +32,8 @@ export const createSurvey = asyncHandler(async (req, res) => {
         createdBy,
     } = req.body;
 
-    if (!name || !status || !createdBy) {
-        throw new ApiError(400, "name, status, and createdBy are required");
+    if (!name || !status || !createdBy || !surveyId) {
+        throw new ApiError(400, "name, status, surveyId and createdBy are required");
     }
 
     if (
@@ -54,6 +55,7 @@ export const createSurvey = asyncHandler(async (req, res) => {
     }
 
     const survey = await Survey.create({
+        surveyId,
         name,
         status,
         supportedLanguages,
