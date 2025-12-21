@@ -44,13 +44,14 @@ export async function generateQuestionsForType4(enterpriseType, registrationStat
     return JSON.stringify(res);
 }
 
-(
-    async()=>{
-        console.log(
-            await generateQuestionsForType1("get details on house owners and responsibilty awareness", "mixed", "null", "15 questions", "Suburban", ['hindi','english','marathi','kannada'])
-        )
-    }
-)()
+//It was running directly on server start
+// (
+//     async()=>{
+//         console.log(
+//             await generateQuestionsForType1("get details on house owners and responsibilty awareness", "mixed", "null", "15 questions", "Suburban", ['hindi','english','marathi','kannada'])
+//         )
+//     }
+// )()
 
 
 //
