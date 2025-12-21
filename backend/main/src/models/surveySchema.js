@@ -114,7 +114,7 @@ export const SurveySchema = new Schema(
         },
         status: {
             type: String,
-            enum: ["waiting", "approved", "active", "complete"],
+            enum: ["approved", "active", "complete"],
             required: true,
         },
 
