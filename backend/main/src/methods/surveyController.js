@@ -3,6 +3,10 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { Survey } from "../models/surveySchema.js";
 
+function toMap(obj) {
+    return new Map(Object.entries(obj));
+}
+
 export const getSurveyById = asyncHandler(async (req, res) => {
     const { survey_id } = req.params;
 
@@ -23,6 +27,7 @@ export const getSurveyById = asyncHandler(async (req, res) => {
 
 export const createSurvey = asyncHandler(async (req, res) => {
     const {
+        surveyId,
         name,
         status,
         supportedLanguages,
@@ -53,14 +58,25 @@ export const createSurvey = asyncHandler(async (req, res) => {
         throw new ApiError(400, "categories must be a non-empty array");
     }
 
+    const normalizedQuestions = questions.map((q) => ({
+        ...q,
+        text: toMap(q.text),
+        options: q.options.map((opt) => ({
+            ...opt,
+            label: toMap(opt.label),
+        })),
+    }));
+
     const survey = await Survey.create({
+        surveyId,
         name,
         status,
         supportedLanguages,
-        questions,
+        questions: normalizedQuestions,
         categories,
         createdBy,
     });
+
 
     return res.status(201).json(
         new ApiResponse(201, survey, "Survey created successfully")

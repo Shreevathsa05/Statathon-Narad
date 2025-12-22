@@ -23,20 +23,15 @@ export const LANGUAGES = [
 /* Localized Text (dynamic + strict)  */
 /* ---------------------------------- */
 
-const LocalizedTextSchema = new Schema(
-    {
-        type: Map,
-        of: {
-            type: String,
-            minlength: 1,
-            required: true,
-        },
+const LocalizedTextSchema = {
+    type: Map,
+    of: {
+        type: String,
+        minlength: 1,
+        required: true,
     },
-    {
-        _id: false,
-        strict: true,
-    }
-);
+};
+
 
 /* ---------------------------------- */
 /* ShowIf                             */
@@ -57,10 +52,18 @@ const ShowIfSchema = new Schema(
 const OptionSchema = new Schema(
     {
         id: { type: String, required: true },
-        label: { type: LocalizedTextSchema, required: true },
+        label: {
+            type: Map,
+            of: {
+                type: String,
+                minlength: 1,
+            },
+            required: true,
+        },
     },
     { _id: false }
 );
+
 
 /* ---------------------------------- */
 /* Question                           */
@@ -68,10 +71,7 @@ const OptionSchema = new Schema(
 
 const QuestionSchema = new Schema(
     {
-        qid: {
-            type: String,
-            required: true
-        },
+        qid: { type: String, required: true },
 
         type: {
             type: String,
@@ -79,7 +79,14 @@ const QuestionSchema = new Schema(
             required: true,
         },
 
-        text: { type: LocalizedTextSchema, required: true },
+        text: {
+            type: Map,
+            of: {
+                type: String,
+                minlength: 1,
+            },
+            required: true,
+        },
 
         options: {
             type: [OptionSchema],
