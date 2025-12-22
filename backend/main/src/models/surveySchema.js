@@ -23,20 +23,15 @@ export const LANGUAGES = [
 /* Localized Text (dynamic + strict)  */
 /* ---------------------------------- */
 
-const LocalizedTextSchema = new Schema(
-    {
-        type: Map,
-        of: {
-            type: String,
-            minlength: 1,
-            required: true,
-        },
+const LocalizedTextSchema = {
+    type: Map,
+    of: {
+        type: String,
+        minlength: 1,
+        required: true,
     },
-    {
-        _id: false,
-        strict: true,
-    }
-);
+};
+
 
 /* ---------------------------------- */
 /* ShowIf                             */
@@ -76,10 +71,7 @@ const OptionSchema = new Schema(
 
 const QuestionSchema = new Schema(
     {
-        qid: {
-            type: String,
-            required: true
-        },
+        qid: { type: String, required: true },
 
         type: {
             type: String,
@@ -91,9 +83,9 @@ const QuestionSchema = new Schema(
             type: Map,
             of: {
                 type: String,
-                minlength: 1
+                minlength: 1,
             },
-            required: true
+            required: true,
         },
 
         options: {

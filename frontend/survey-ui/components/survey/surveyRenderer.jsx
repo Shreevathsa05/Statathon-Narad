@@ -57,7 +57,7 @@ export default function SurveyRenderer({ questions, supportedLanguages, surveyId
       .filter(Boolean);
 
     try {
-      const res = await fetch(
+      const res = await fetch( 
         `http://localhost:3000/api/response/${surveyId}`,
         {
           method: "POST",
