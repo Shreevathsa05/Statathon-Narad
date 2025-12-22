@@ -47,32 +47,45 @@ export const paraInfoSchema = new Schema(
     }
 );
 
-const surveyResponseSchema = new Schema(
-    {
-        surveyId: {
-            type: String,
-            required: true,
-            index: true
-        },
-        user: {
-            type:userInfoSchema,
-            required: true
-        },
-        paraInfo: {
-            type: paraInfoSchema,
-        },
-        response: [
-            {
-                qid: { type: String, required: true },
-                optionId: { type: String, required: true },
-                timeSpentMs: { type: Number, required: true }
-            }
-        ],
+const responseItemSchema = new Schema(
+  {
+    qid: {
+      type: String,
+      required: true,
     },
-    {
-        timestamps: true,
-        strict: true
-    }
+    optionId: {
+      type: String,
+    },
+    value: {
+      type: Schema.Types.Mixed, // string | number
+    },
+  },
+  { _id: false } // ✅ IMPORTANT
+);
+
+const surveyResponseSchema = new Schema(
+  {
+    surveyId: {
+      type: String,
+      required: true,
+      index: true,
+    },
+    user: {
+      type: userInfoSchema,
+      required: true,
+    },
+    paraInfo: {
+      type: paraInfoSchema,
+    },
+    response: {
+      type: [responseItemSchema],
+      required: true,
+    },
+  },
+  {
+    timestamps: true,
+    strict: true,
+  }
 );
 
 export const SurveyResponse = mongoose.model("SurveyResponse", surveyResponseSchema);

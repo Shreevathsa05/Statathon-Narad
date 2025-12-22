@@ -20,7 +20,7 @@ export const submitSurveyResponse = asyncHandler(async (req, res) => {
         throw new ApiError(403, "Survey is not accepting responses");
     }
 
-    const { response, user, paraInfo } = req.body;
+    const { response, user, paraInfo = "" } = req.body;
 
     if (!Array.isArray(response) || response.length === 0) {
         throw new ApiError(400, "Response must be a non-empty array");
@@ -34,12 +34,70 @@ export const submitSurveyResponse = asyncHandler(async (req, res) => {
         }
     }
 
-    const surveyResponse = await SurveyResponse.create({
+    const questionMap = new Map(
+        survey.questions.map(q => [q.qid, q])
+    );
+
+    for (const ans of response) {
+        const question = questionMap.get(ans.qid);
+
+        if (!question) {
+            throw new ApiError(400, `Invalid questionId ${ans.qid}`);
+        }
+
+        // ---- MCQ ----
+        if (question.type === "mcq") {
+            if (!ans.optionId) {
+                throw new ApiError(
+                    400,
+                    `optionId is required for MCQ question ${ans.qid}`
+                );
+            }
+
+            const validOptions = question.options.map(o => o.id);
+            if (!validOptions.includes(ans.optionId)) {
+                throw new ApiError(
+                    400,
+                    `Invalid optionId ${ans.optionId} for question ${ans.qid}`
+                );
+            }
+        }
+
+        // ---- TEXT ----
+        if (question.type === "text") {
+            if (
+                typeof ans.value !== "string" ||
+                ans.value.trim().length === 0
+            ) {
+                throw new ApiError(
+                    400,
+                    `Valid text value required for question ${ans.qid}`
+                );
+            }
+        }
+
+        // ---- NUMBER ----
+        if (question.type === "number") {
+            if (typeof ans.value !== "number" || Number.isNaN(ans.value)) {
+                throw new ApiError(
+                    400,
+                    `Valid numeric value required for question ${ans.qid}`
+                );
+            }
+        }
+    }
+
+
+    const responseObj = {
         surveyId: survey_id,
         user,
-        paraInfo,
         response
-    }); // need changes
+    }
+    if (paraInfo) {
+        responseObj.paraInfo = paraInfo
+    }
+
+    const surveyResponse = await SurveyResponse.create(responseObj); // need changes
 
     return res.status(201).json(
         new ApiResponse(201, surveyResponse, "Successfully created survey response")

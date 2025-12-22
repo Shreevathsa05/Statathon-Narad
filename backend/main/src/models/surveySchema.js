@@ -56,10 +56,10 @@ const OptionSchema = new Schema(
             type: Map,
             of: {
                 type: String,
-                minlength: 1,
+                minlength: 1
             },
-            required: true,
-        },
+            required: true
+        }
     },
     { _id: false }
 );
@@ -75,7 +75,7 @@ const QuestionSchema = new Schema(
 
         type: {
             type: String,
-            enum: ["mcq"],
+            enum: ["mcq", "text", "checkbox", "number"],
             required: true,
         },
 
@@ -90,12 +90,20 @@ const QuestionSchema = new Schema(
 
         options: {
             type: [OptionSchema],
-            required: true,
+            required: function () {
+                return this.type === "mcq" || this.type === "checkbox";
+            },
             validate: {
-                validator: (v) => Array.isArray(v) && v.length >= 2 && v.length <= 5,
-                message: "MCQ must have between 2 and 5 options",
+                validator: function (v) {
+                    if (this.type === "mcq" || this.type === "checkbox") {
+                        return Array.isArray(v) && v.length >= 2 && v.length <= 5;
+                    }
+                    return true; 
+                },
+                message: "MCQ/Checkbox must have between 2 and 5 options",
             },
         },
+
 
         showIf: { type: ShowIfSchema, required: false },
     },
