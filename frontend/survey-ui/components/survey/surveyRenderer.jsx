@@ -4,7 +4,7 @@ import { useState } from "react";
 import DynamicField from "@/components/survey/DynamicField";
 import { shouldShowField } from "@/components/survey/ConditionEvaluator";
 
-export default function SurveyRenderer({ schema, surveyId }) {
+export default function SurveyRenderer({ questions, supportedLanguages, surveyId }) {
   const [answers, setAnswers] = useState({});
   const [loading, setLoading] = useState(false);
 
@@ -12,6 +12,8 @@ export default function SurveyRenderer({ schema, surveyId }) {
     fullname: "",
     phone_no: "",
   });
+  const [language, setLanguage] = useState("english");
+
 
   const handleChange = (qid, value) => {
     setAnswers((prev) => ({ ...prev, [qid]: value }));
@@ -29,7 +31,7 @@ export default function SurveyRenderer({ schema, surveyId }) {
 
     setLoading(true);
 
-    const response = schema
+    const response = questions
       .filter((question) => shouldShowField(question, answers))
       .map((question) => {
         const answer = answers[question.qid];
@@ -112,9 +114,37 @@ export default function SurveyRenderer({ schema, surveyId }) {
         </div>
       </section>
 
+      {/* Language Selector */}
+      {/* Top Bar */}
+      <div className="sticky top-0 z-10 bg-white border-b">
+        <div className="max-w-3xl mx-auto px-6 py-3 flex justify-between items-center">
+          <h1 className="text-lg font-semibold text-gray-700">
+            Survey Form
+          </h1>
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">
+              Language:
+            </span>
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              className="border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {supportedLanguages.map((l) => (
+                <option key={l} value={l}>
+                  {l.charAt(0).toUpperCase() + l.slice(1)}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+
       {/* Survey Questions */}
       <section className="space-y-6">
-        {schema.map((field) =>
+        {questions.map((field) =>
           shouldShowField(field, answers) ? (
             <div
               key={field.qid}
@@ -123,6 +153,7 @@ export default function SurveyRenderer({ schema, surveyId }) {
               <DynamicField
                 field={field}
                 value={answers[field.qid]}
+                language={language}
                 onChange={handleChange}
               />
             </div>

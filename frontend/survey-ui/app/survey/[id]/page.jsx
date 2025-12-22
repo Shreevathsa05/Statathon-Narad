@@ -20,6 +20,5 @@ export default async function SurveyPage(props) {
   const params = await props.params;
   const surveyId = params.id;
   const survey = await getSurveySchema(surveyId);
-
-  return <SurveyRenderer schema={survey.questions} surveyId={surveyId}/>;
+  return <SurveyRenderer questions={survey.questions} supportedLanguages={survey.supportedLanguages} surveyId={surveyId}/>;
 }
