@@ -23,20 +23,30 @@ export const LANGUAGES = [
 /* Localized Text (dynamic + strict)  */
 /* ---------------------------------- */
 
-const LocalizedTextSchema = new Schema(
-    {
-        type: Map,
-        of: {
-            type: String,
-            minlength: 1,
-            required: true,
-        },
-    },
-    {
-        _id: false,
-        strict: true,
-    }
-);
+// const LocalizedTextSchema = new Schema(
+//     {
+//         type: Map,
+//         of: {
+//             type: String,
+//             minlength: 1,
+//             required: true,
+//         },
+//     },
+//     {
+//         _id: false,
+//         strict: true,
+//     }
+// );
+
+const LocalizedTextDefinition = {
+  type: Map,
+  of: {
+    type: String,
+    minlength: 1,
+    required: true,
+  },
+  // Note: _id: false is not needed for Maps
+};
 
 /* ---------------------------------- */
 /* ShowIf                             */
@@ -55,11 +65,15 @@ const ShowIfSchema = new Schema(
 /* ---------------------------------- */
 
 const OptionSchema = new Schema(
-    {
-        id: { type: String, required: true },
-        label: { type: LocalizedTextSchema, required: true },
+  {
+    id: { type: String, required: true },
+    // label: { type: LocalizedTextSchema, required: true },
+    label: {
+      ...LocalizedTextDefinition,
+      required: true,
     },
-    { _id: false }
+  },
+  { _id: false }
 );
 
 /* ---------------------------------- */
@@ -67,32 +81,42 @@ const OptionSchema = new Schema(
 /* ---------------------------------- */
 
 const QuestionSchema = new Schema(
-    {
-        qid: {
-            type: String,
-            required: true
-        },
-
-        type: {
-            type: String,
-            enum: ["mcq"],
-            required: true,
-        },
-
-        text: { type: LocalizedTextSchema, required: true },
-
-        options: {
-            type: [OptionSchema],
-            required: true,
-            validate: {
-                validator: (v) => Array.isArray(v) && v.length >= 2 && v.length <= 5,
-                message: "MCQ must have between 2 and 5 options",
-            },
-        },
-
-        showIf: { type: ShowIfSchema, required: false },
+  {
+    qid: {
+      type: String,
+      required: true,
     },
-    { _id: false }
+
+    type: {
+      type: String,
+      enum: ["mcq"],
+      required: true,
+    },
+
+    // text: { type: LocalizedTextSchema, required: true },
+    text: {
+      ...LocalizedTextDefinition,
+      required: true,
+    },
+
+    options: {
+      type: [OptionSchema],
+      required: true,
+      validate: {
+        validator: (v) => Array.isArray(v) && v.length >= 2 && v.length <= 5,
+        message: "MCQ must have between 2 and 5 options",
+      },
+    },
+
+    showIf: { type: ShowIfSchema, required: false },
+
+    audio: {
+      type: Map,
+      of: String, // Example: { "english": "/audio/tts/en_123.mp3" }
+      default: {},
+    },
+  },
+  { _id: false }
 );
 
 /* ---------------------------------- */
