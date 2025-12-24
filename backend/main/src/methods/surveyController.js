@@ -82,3 +82,14 @@ export const createSurvey = asyncHandler(async (req, res) => {
         new ApiResponse(201, survey, "Survey created successfully")
     );
 });
+
+export const getAllSurveys = asyncHandler(async (req, res) => {
+    const surveys = await Survey.find().select("name surveyId status");
+
+    if (!surveys || surveys.length === 0) {
+        throw new ApiError(500, "Failed to fetch surveys")
+    }
+    return res.status(200).json(
+        new ApiResponse(200, surveys, "Successfully fetched surveys")
+    );
+})
