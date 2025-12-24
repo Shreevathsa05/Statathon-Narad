@@ -1,5 +1,4 @@
-import SurveyRenderer from "@/components/survey/SurveyRenderer";
-import { BASE_URL } from "@/constants";
+import SurveyRenderer from "@/components/survey/surveyRenderer";
 
 async function getSurveySchema(surveyId) {
   "use cache";

@@ -12,7 +12,6 @@ const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ---- Middlewares ----
 app.use(cors({ origin: "*" })); // Adjust origin for production security later
 app.use(express.json());
 app.use(express.urlencoded({ extended: true, limit: "16kb" }));
@@ -37,7 +36,7 @@ app.get("/", (req, res) => {
 });
 
 // ---- Server ----
-const PORT = 3000;
+const PORT = 3001;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(
