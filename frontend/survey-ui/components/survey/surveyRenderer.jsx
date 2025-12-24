@@ -3,6 +3,7 @@
 import { useState } from "react";
 import DynamicField from "@/components/survey/DynamicField";
 import { shouldShowField } from "@/components/survey/ConditionEvaluator";
+import { BASE_URL } from "@/constants";
 
 export default function SurveyRenderer({ questions, supportedLanguages, surveyId }) {
   const [answers, setAnswers] = useState({});
@@ -58,7 +59,7 @@ export default function SurveyRenderer({ questions, supportedLanguages, surveyId
 
     try {
       const res = await fetch( 
-        `http://localhost:3000/api/response/${surveyId}`,
+        `${BASE_URL}/response/${surveyId}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
