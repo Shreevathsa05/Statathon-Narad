@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
+import LoadingBar from "../components/layout/LoadingBar";
 
 import Page from "../components/layout/Page";
 import SurveyTypeSelector from "../components/survey/SurveyTypeSelector";
@@ -122,9 +123,18 @@ export default function GeneratorValidator() {
   return (
     <Page title="Survey Generator & Validator">
       {error && <p className="text-red-600 mb-4">{error}</p>}
+      {loading && (
+        <div className="mb-4">
+          <LoadingBar />
+          <p className="text-sm text-gray-500 mt-2">
+            Generating survey questions. This may take a few seconds…
+          </p>
+        </div>
+      )}
 
       {/* ================= CONFIGURATION ================= */}
-      {!generatedSurvey && (
+      <div className={loading ? "opacity-60 pointer-events-none" : ""}>
+        {!generatedSurvey && (
         <>
           <SurveyTypeSelector value={surveyType} onChange={setSurveyType} />
 
@@ -155,8 +165,8 @@ export default function GeneratorValidator() {
             {loading ? "Generating..." : "Generate Questions"}
           </button>
         </>
-      )}
-
+        )}
+      </div>
       {/* ================= REVIEW ================= */}
       {generatedSurvey && (
         <>

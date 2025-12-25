@@ -1,25 +1,20 @@
-import React from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
-
+import { Routes, Route } from "react-router-dom";
+import Home from "./pages/Home";
 import GeneratorValidator from "./pages/Generator_validator";
+import SurveyViewer from "./pages/SurveyViewer";
+import Navbar from "./components/layout/Navbar";
 
 export default function App() {
   return (
-    <Routes>
-      {/* Default route */}
-      <Route path="/" element={<Navigate to="/generator" />} />
-
-      {/* Survey Generator + Validator */}
-      <Route
-        path="/generator"
-        element={<GeneratorValidator />}
-      />
-
-      {/* Fallback */}
-      <Route
-        path="*"
-        element={<div style={{ padding: 20 }}>Page not found</div>}
-      />
-    </Routes>
+    <>
+      <Navbar />
+      <div className="max-w-6xl mx-auto px-4 py-6">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/generate" element={<GeneratorValidator />} />
+          <Route path="/survey/:surveyId" element={<SurveyViewer />} />
+        </Routes>
+      </div>
+    </>
   );
 }
