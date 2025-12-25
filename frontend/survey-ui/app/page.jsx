@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BASE_URL } from "@/constants";
-
 export default function Home() {
   const [surveys, setSurveys] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -55,11 +54,10 @@ export default function Home() {
             </p>
 
             <span
-              className={`inline-block px-3 py-1 text-sm rounded-full ${
-                survey.status === "active"
+              className={`inline-block px-3 py-1 text-sm rounded-full ${survey.status === "active"
                   ? "bg-green-100 text-green-700"
                   : "bg-blue-100 text-blue-700"
-              }`}
+                }`}
             >
               {survey.status}
             </span>
