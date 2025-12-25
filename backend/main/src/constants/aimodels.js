@@ -1,9 +1,9 @@
-import { ChatOllama } from "@langchain/ollama";
+// import { ChatOllama } from "@langchain/ollama";
 // import { ChatOpenAI } from "@langchain/openai";
 import { createAgent } from "langchain";
 import { configDotenv } from "dotenv";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { ChatOpenAI } from "@langchain/openai";
+// import { ChatOpenAI } from "@langchain/openai";
 configDotenv();
 
 export const nativeModel = new ChatGoogleGenerativeAI({
