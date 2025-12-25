@@ -16,7 +16,7 @@ export const submitSurveyResponse = asyncHandler(async (req, res) => {
         throw new ApiError(404, "Survey not found");
     }
 
-    if (survey.status !== "active") {
+    if (survey.status !== "active" && survey.status !== "approved") {
         throw new ApiError(403, "Survey is not accepting responses");
     }
 

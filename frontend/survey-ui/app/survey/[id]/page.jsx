@@ -3,7 +3,6 @@ import { BASE_URL } from "@/constants";
 
 async function getSurveySchema(surveyId) {
   "use cache";
-
   const res = await fetch(
     `${BASE_URL}/survey/${surveyId}`,
     { cache: "force-cache" }
