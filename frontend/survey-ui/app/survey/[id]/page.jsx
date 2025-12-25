@@ -1,9 +1,9 @@
 import SurveyRenderer from "@/components/survey/surveyRenderer";
+import { BASE_URL } from "@/constants";
 
 async function getSurveySchema(surveyId) {
   "use cache";
 
-  console.log(BASE_URL);
   const res = await fetch(
     `${BASE_URL}/survey/${surveyId}`,
     { cache: "force-cache" }
