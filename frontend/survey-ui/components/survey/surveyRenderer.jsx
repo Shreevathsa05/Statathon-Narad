@@ -4,6 +4,7 @@ import { useState } from "react";
 import DynamicField from "@/components/survey/DynamicField";
 import { shouldShowField } from "@/components/survey/ConditionEvaluator";
 import { BASE_URL } from "@/constants";
+import { useRouter } from "next/navigation";
 
 export default function SurveyRenderer({ questions, supportedLanguages, surveyId }) {
   const [answers, setAnswers] = useState({});
@@ -14,7 +15,7 @@ export default function SurveyRenderer({ questions, supportedLanguages, surveyId
     phone_no: "",
   });
   const [language, setLanguage] = useState("english");
-
+  const router = useRouter();
 
   const handleChange = (qid, value) => {
     setAnswers((prev) => ({ ...prev, [qid]: value }));
@@ -25,12 +26,11 @@ export default function SurveyRenderer({ questions, supportedLanguages, surveyId
   };
 
   const handleSubmit = async () => {
+    if (loading) return
     if (!userInfo.fullname || !userInfo.phone_no) {
       alert("Please enter your name and phone number");
       return;
     }
-
-    setLoading(true);
 
     const response = questions
       .filter((question) => shouldShowField(question, answers))
@@ -57,8 +57,16 @@ export default function SurveyRenderer({ questions, supportedLanguages, surveyId
       })
       .filter(Boolean);
 
+    if (response.length === 0) {
+      alert("No responses to submit");
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      const res = await fetch( 
+      const res = await fetch(
         `${BASE_URL}/response/${surveyId}`,
         {
           method: "POST",
@@ -78,6 +86,7 @@ export default function SurveyRenderer({ questions, supportedLanguages, surveyId
       }
 
       alert("Survey submitted successfully");
+      router.push("/")
     } catch (err) {
       console.error(err);
       alert("Something went wrong");
