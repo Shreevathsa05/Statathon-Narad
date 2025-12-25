@@ -1,0 +1,28 @@
+version: "3.8"
+services:
+  backend:
+    build: ./main
+    container_name: backend
+    expose:
+      - "3000"
+
+  delivery:
+    build: ./delivery
+    container_name: delivery
+    expose:
+      - "4000"
+
+  delivery_bot:
+    build: ./delivery_bot
+    container_name: delivery_bot
+    expose:
+      - "5000"
+
+  nginx:
+    image: nginx:latest
+    ports:
+      - "8080:8080"
+    depends_on:
+      - backend
+      - delivery
+      - delivery_bot
