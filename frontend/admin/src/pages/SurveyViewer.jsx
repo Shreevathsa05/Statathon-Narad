@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 
-const API_BASE = "https://narad-main.onrender.com";
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
 export default function SurveyViewer() {
   const { surveyId } = useParams();
@@ -22,18 +22,29 @@ export default function SurveyViewer() {
 
   return (
     <>
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center mb-4">
         <h1 className="text-xl font-semibold">{survey.name}</h1>
 
-        <select
-          className="border px-2 py-1"
-          value={lang}
-          onChange={(e) => setLang(e.target.value)}
-        >
-          {survey.supportedLanguages.map((l) => (
-            <option key={l}>{l}</option>
-          ))}
-        </select>
+        <div className="flex items-center gap-3">
+          <select
+            className="border px-3 py-2 rounded-xl"
+            value={lang}
+            onChange={(e) => setLang(e.target.value)}
+          >
+            {survey.supportedLanguages.map((l) => (
+              <option key={l}>{l}</option>
+            ))}
+          </select>
+          <a
+            href={`https://statathon-narad.vercel.app/survey/${surveyId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-blue-600 hover:underline"
+          >
+            Open Public Survey →
+          </a>
+        </div>
+
       </div>
 
       <div className="space-y-4">
