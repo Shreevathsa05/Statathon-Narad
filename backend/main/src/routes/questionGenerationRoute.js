@@ -1,6 +1,8 @@
 import { Router } from "express";
-import {generateQuestionsForType1,generateQuestionsForType2,generateQuestionsForType3,generateQuestionsForType4} from '../methods/QBgenerator.js'
+import {generateCustomQuestions, generateQuestionsForType1,generateQuestionsForType2,generateQuestionsForType3,generateQuestionsForType4} from '../methods/QBgenerator.js'
 import { AllLanguages } from "../constants/zodSchema.js";
+import {loadDocument} from '../constants/uploader.js'
+import {buildPromptFromDocs} from '../constants/promptBuilder.js'
 
 const questionGenerationRouter = Router();
 
@@ -76,5 +78,30 @@ questionGenerationRouter.post("/type4", async (req, res) => {
     // console.log(ans)
     res.send(ans);
 });
+
+questionGenerationRouter.post("/custom_generate_questions", async (req, res) => {
+    try {
+        const { customprompt, languages = ["english"] } = req.body;
+
+        if (!req.file) {
+            return res.status(400).json({ error: "File is required" });
+        }
+        if (!customprompt) {
+            return res.status(400).json({ error: "customprompt is required" });
+        }
+
+        // Load document
+        const rawDocs = await loadDocument(req.file.filename);
+
+        // Generate questions
+        const ans = await generateCustomQuestions(rawDocs, finalPrompt,languages);
+
+        res.send(ans);
+    } catch (error) {
+        console.error(error);
+        res.status(500).send(error.message);
+    }
+});
+
 
 export default questionGenerationRouter;

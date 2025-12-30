@@ -196,3 +196,5 @@ Rules:
 - Output ONLY valid JSON
 `;
 }
+
+export const summarizerSystemPrompt=`Summarize the following content`;
