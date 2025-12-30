@@ -1,6 +1,7 @@
 import { type1prompt, type2prompt, type3prompt, type4prompt, outputSchema } from '../constants/promptTemplates.js'
 import { surveySchemaForLanguages } from '../constants/zodSchema.js'
 import { nativeModel } from '../constants/aimodels.js'
+import { summarizer } from '../constants/uploader.js';
 
 export async function generateQuestionsForType1(surveyObjective, householdType, recallPeriod, surveyLength, region, languages) {
     // languages is array
@@ -41,6 +42,13 @@ export async function generateQuestionsForType4(enterpriseType, registrationStat
     const final_prompt = prompt_p1 + outputschema;
 
     const res = await nativeModel.withStructuredOutput(surveySchemaForLanguages(languages)).invoke(final_prompt);
+    return JSON.stringify(res);
+}
+
+export async function generateCustomQuestions(rawDocs, customprompt, languages){
+    const summary = await summarizer(rawDocs);
+    const final_prompt =  customprompt + "\nContext of document provided: \n" + summary + outputSchema(languages)
+    const res= await nativeModel.invoke(final_prompt);
     return JSON.stringify(res);
 }
 
