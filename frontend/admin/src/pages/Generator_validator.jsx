@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import LoadingBar from "../components/layout/LoadingBar";
+import { toast } from "react-toastify";
 
 import Page from "../components/layout/Page";
 import SurveyTypeSelector from "../components/survey/SurveyTypeSelector";
@@ -44,12 +45,12 @@ export default function GeneratorValidator() {
     setError("");
 
     if (!surveyType) {
-      setError("Survey type is required");
+      toast.warning("Survey type is required");
       return;
     }
 
     if (languages.length === 0) {
-      setError("Select at least one language");
+      toast.warning("Select at least one language");
       return;
     }
 
@@ -66,7 +67,7 @@ export default function GeneratorValidator() {
       setPreviewLanguage(parsed.supportedLanguages[0]);
       setSelectedQids(new Set(parsed.questions.map((q) => q.qid)));
     } catch (err) {
-      setError("Question generation failed");
+      toast.error("Question generation failed");
     } finally {
       setLoading(false);
     }
@@ -84,7 +85,7 @@ export default function GeneratorValidator() {
   /* -------- Approve survey -------- */
   async function handleApprove() {
     if (selectedQids.size < 1) {
-      alert("At least one question must be selected");
+      toast.warning("At least one question must be selected");
       return;
     }
 
@@ -102,10 +103,10 @@ export default function GeneratorValidator() {
 
     try {
       await createSurvey(payload);
-      alert("Survey created successfully");
+      toast.success("Survey created successfully");
       resetAll();
     } catch {
-      setError("Failed to create survey");
+      toast.warning("Failed to create survey");
     }
   }
 
