@@ -154,21 +154,28 @@ export default function SurveyRenderer({ questions, supportedLanguages, surveyId
 
       {/* Survey Questions */}
       <section className="space-y-6">
-        {questions.map((field) =>
-          shouldShowField(field, answers) ? (
+        {questions.map((field) => {
+          const visible = shouldShowField(field, answers);
+
+          return (
             <div
               key={field.qid}
-              className="bg-white rounded-xl shadow p-6"
+              className={`
+                  transition-all duration-300 ease-in-out overflow-hidden
+                  ${visible ? "max-h-1/6 opacity-100 translate-y-0" : "max-h-0 opacity-0 -translate-y-2"}
+                `}
             >
-              <DynamicField
-                field={field}
-                value={answers[field.qid]}
-                language={language}
-                onChange={handleChange}
-              />
+              <div className="bg-white rounded-xl shadow p-0">
+                <DynamicField
+                  field={field}
+                  value={answers[field.qid]}
+                  language={language}
+                  onChange={handleChange}
+                />
+              </div>
             </div>
-          ) : null
-        )}
+          );
+        })}
       </section>
 
       {/* Submit */}
