@@ -5,6 +5,7 @@ import DynamicField from "@/components/survey/DynamicField";
 import { shouldShowField } from "@/components/survey/ConditionEvaluator";
 import { BASE_URL } from "@/constants";
 import { useRouter } from "next/navigation";
+import { speak } from "@/lib/textToSpeech";
 
 export default function SurveyRenderer({ questions, supportedLanguages, surveyId }) {
   const [answers, setAnswers] = useState({});
@@ -16,7 +17,6 @@ export default function SurveyRenderer({ questions, supportedLanguages, surveyId
   });
   const [language, setLanguage] = useState("english");
   const router = useRouter();
-
   const handleChange = (qid, value) => {
     setAnswers((prev) => ({ ...prev, [qid]: value }));
   };
@@ -156,6 +156,10 @@ export default function SurveyRenderer({ questions, supportedLanguages, surveyId
       <section className="space-y-6">
         {questions.map((field) => {
           const visible = shouldShowField(field, answers);
+
+          if (visible && field.text?.[language]) {
+            speak(field.text?.[language], language);
+          }
 
           return (
             <div
