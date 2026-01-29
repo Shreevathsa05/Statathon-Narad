@@ -6,14 +6,14 @@ import path from "path";
 import fs from "fs";
 import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
 import { DocxLoader } from "@langchain/community/document_loaders/fs/docx";
-import { PPTXLoader } from "@langchain/community/document_loaders/fs/pptx";
-import { TextLoader } from "langchain/document_loaders/fs/text";
+// import { PPTXLoader } from "@langchain/community/document_loaders/fs/pptx";
+// import { TextLoader } from "langchain/document_loaders/fs/text";
 import { CSVLoader } from "@langchain/community/document_loaders/fs/csv";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { GoogleGenerativeAIEmbeddings } from '@langchain/google-genai';
 import { fileURLToPath } from "url";
-import { nativeModel } from './aimodels';
-import { summarizerSystemPrompt } from './promptTemplates';
+import { nativeModel } from './aimodels.js';
+import { summarizerSystemPrompt } from './promptTemplates.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -46,13 +46,13 @@ export async function loadDocument(fileName) {
             break;
 
         case ".pptx":
-            loader = new PPTXLoader(filePath);
-            rawDocs = await loader.load();
+            // loader = new PPTXLoader(filePath);
+            // rawDocs = await loader.load();
             break;
 
         case ".txt":
-            loader = new TextLoader(filePath);
-            rawDocs = await loader.load();
+            // loader = new TextLoader(filePath);
+            // rawDocs = await loader.load();
             break;
 
         case ".csv":
