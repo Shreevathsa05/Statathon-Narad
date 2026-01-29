@@ -1,8 +1,6 @@
 import { Router } from "express";
-import {generateCustomQuestions, generateQuestionsForType1,generateQuestionsForType2,generateQuestionsForType3,generateQuestionsForType4} from '../methods/QBgenerator.js'
+import {generateQuestionsForType1,generateQuestionsForType2,generateQuestionsForType3,generateQuestionsForType4} from '../methods/QBgenerator.js'
 import { AllLanguages } from "../constants/zodSchema.js";
-import {loadDocument} from '../constants/uploader.js'
-import {buildPromptFromDocs} from '../constants/promptBuilder.js'
 
 const questionGenerationRouter = Router();
 
