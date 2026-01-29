@@ -5,6 +5,7 @@ import DynamicField from "@/components/survey/DynamicField";
 import { shouldShowField } from "@/components/survey/ConditionEvaluator";
 import { BASE_URL } from "@/constants";
 import { useRouter } from "next/navigation";
+import { speak } from "@/lib/textToSpeech";
 
 export default function SurveyRenderer({ questions, supportedLanguages, surveyId }) {
   const [answers, setAnswers] = useState({});
@@ -16,6 +17,7 @@ export default function SurveyRenderer({ questions, supportedLanguages, surveyId
   });
   const [language, setLanguage] = useState("english");
   const router = useRouter();
+  const [currentSpeak, setCurrentSpeak] = useState(null);
 
   const handleChange = (qid, value) => {
     setAnswers((prev) => ({ ...prev, [qid]: value }));
@@ -23,6 +25,22 @@ export default function SurveyRenderer({ questions, supportedLanguages, surveyId
 
   const handleUserChange = (field, value) => {
     setUserInfo((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSpeakQuestion = async (field) => {
+    if (!field.text?.[language]) return;
+    setCurrentSpeak(field.qid);
+    window.speechSynthesis.cancel();
+
+    await speak(field.text[language], language);
+
+    if (Array.isArray(field.options)) {
+      for (const opt of field.options) {
+        if (opt.label?.[language]) {
+          await speak(opt.label[language], language);
+        }
+      }
+    }
   };
 
   const handleSubmit = async () => {
@@ -151,24 +169,42 @@ export default function SurveyRenderer({ questions, supportedLanguages, surveyId
         </div>
       </div>
 
-
       {/* Survey Questions */}
       <section className="space-y-6">
-        {questions.map((field) =>
-          shouldShowField(field, answers) ? (
+        {questions.map((field) => {
+          const visible = shouldShowField(field, answers);
+
+          if (!visible) {
+            return null;
+          }
+          
+          return (
             <div
               key={field.qid}
-              className="bg-white rounded-xl shadow p-6"
+              className={`
+                  transition-all duration-300 ease-in-out overflow-hidden
+                  ${visible ? "max-h-1/6 opacity-100 translate-y-0" : "max-h-0 opacity-0 -translate-y-2"}
+                `}
             >
-              <DynamicField
-                field={field}
-                value={answers[field.qid]}
-                language={language}
-                onChange={handleChange}
-              />
+              <div className="bg-white rounded-xl shadow p-0">
+                <DynamicField
+                  field={field}
+                  value={answers[field.qid]}
+                  language={language}
+                  onChange={handleChange}
+                />
+                <button
+                  type="button"
+                  onClick={() => handleSpeakQuestion(field)}
+                  className="p-2 rounded-full hover:bg-gray-100 transition"
+                  title="Read question"
+                >
+                  🔊
+                </button>
+              </div>
             </div>
-          ) : null
-        )}
+          );
+        })}
       </section>
 
       {/* Submit */}

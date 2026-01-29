@@ -9,7 +9,8 @@ export async function generateQuestionsForType1(surveyObjective, householdType, 
     const outputschema = outputSchema(languages);
     const final_prompt = prompt_p1 + outputschema;
 
-    const res = await nativeModel.withStructuredOutput(surveySchemaForLanguages(languages)).invoke(final_prompt)
+    // const res = await nativeModel.withStructuredOutput(surveySchemaForLanguages(languages)).invoke(final_prompt)
+    const res = await nativeModel.invoke(final_prompt)
     return JSON.stringify(res);
 }
 
@@ -19,7 +20,8 @@ export async function generateQuestionsForType2(surveyObjective, ageGroup, refer
     const outputschema = outputSchema(languages);
     const final_prompt = prompt_p1 + outputschema;
 
-    const res = await nativeModel.withStructuredOutput(surveySchemaForLanguages(languages)).invoke(final_prompt);
+    // const res = await nativeModel.withStructuredOutput(surveySchemaForLanguages(languages)).invoke(final_prompt);
+    const res = await nativeModel.invoke(final_prompt)
     return JSON.stringify(res);
 }
 
@@ -29,7 +31,8 @@ export async function generateQuestionsForType3(assetCoverage, debtType, referen
     const outputschema = outputSchema(languages);
     const final_prompt = prompt_p1 + outputschema;
 
-    const res = await nativeModel.withStructuredOutput(surveySchemaForLanguages(languages)).invoke(final_prompt);
+    // const res = await nativeModel.withStructuredOutput(surveySchemaForLanguages(languages)).invoke(final_prompt);
+    const res = await nativeModel.invoke(final_prompt)
     return JSON.stringify(res);
 }
 
@@ -41,7 +44,8 @@ export async function generateQuestionsForType4(enterpriseType, registrationStat
 
     const final_prompt = prompt_p1 + outputschema;
 
-    const res = await nativeModel.withStructuredOutput(surveySchemaForLanguages(languages)).invoke(final_prompt);
+    // const res = await nativeModel.withStructuredOutput(surveySchemaForLanguages(languages)).invoke(final_prompt);
+    const res = await nativeModel.invoke(final_prompt)
     return JSON.stringify(res);
 }
 
