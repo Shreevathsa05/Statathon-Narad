@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Outlet } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Home from "./pages/Home";
@@ -11,11 +11,7 @@ export default function App() {
     <>
       <Navbar />
       <div className="max-w-6xl mx-auto px-4 py-6">
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/generate" element={<GeneratorValidator />} />
-          <Route path="/survey/:surveyId" element={<SurveyViewer />} />
-        </Routes>
+        <Outlet/>
         <ToastContainer
           position="top-right"
           autoClose={3500}
