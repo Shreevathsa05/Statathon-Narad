@@ -29,6 +29,9 @@ export default function GeneratorValidator() {
   const [selectedQids, setSelectedQids] = useState(new Set());
   const [previewLanguage, setPreviewLanguage] = useState("");
 
+  /* ---------------- NEW: Survey Name ---------------- */
+  const [surveyName, setSurveyName] = useState("");
+
   /* ---------------- UI ---------------- */
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -49,29 +52,47 @@ export default function GeneratorValidator() {
       return;
     }
 
-    if (languages.length === 0) {
+    if (!languages || languages.length === 0) {
       toast.warning("Select at least one language");
       return;
     }
 
     setLoading(true);
+
     try {
-      const raw = await generateSurveyQuestions(surveyType, {
+      const surveyData = await generateSurveyQuestions(surveyType, {
         ...formData,
         languages,
       });
 
-      const parsed = raw;
+      if (
+        !surveyData ||
+        !Array.isArray(surveyData.questions) ||
+        surveyData.questions.length === 0
+      ) {
+        throw new Error("Invalid response: missing questions");
+      }
+
+      const parsed = {
+        supportedLanguages: Array.isArray(surveyData.supportedLanguages)
+          ? surveyData.supportedLanguages
+          : languages,
+        questions: surveyData.questions,
+      };
 
       setGeneratedSurvey(parsed);
-      setPreviewLanguage(parsed.supportedLanguages[0]);
+      setPreviewLanguage(parsed.supportedLanguages[0] ?? "");
       setSelectedQids(new Set(parsed.questions.map((q) => q.qid)));
+      setSurveyName(`Survey - ${surveyType}`);
     } catch (err) {
-      toast.error("Question generation failed");
+      console.error("Survey generation error:", err);
+      toast.error(err.message || "Question generation failed");
+      setGeneratedSurvey(null);
     } finally {
       setLoading(false);
     }
   }
+
 
   /* -------- Toggle question selection -------- */
   function toggleQuestion(qid) {
@@ -91,7 +112,7 @@ export default function GeneratorValidator() {
 
     const payload = {
       surveyId: uuidv4(),
-      name: `Survey - ${surveyType}`,
+      name: surveyName?.trim() || `Survey - ${surveyType}`,
       status: "approved",
       supportedLanguages: generatedSurvey.supportedLanguages,
       questions: generatedSurvey.questions.filter((q) =>
@@ -118,6 +139,7 @@ export default function GeneratorValidator() {
     setGeneratedSurvey(null);
     setSelectedQids(new Set());
     setPreviewLanguage("");
+    setSurveyName("");
     setError("");
   }
 
@@ -136,42 +158,57 @@ export default function GeneratorValidator() {
       {/* ================= CONFIGURATION ================= */}
       <div className={loading ? "opacity-60 pointer-events-none" : ""}>
         {!generatedSurvey && (
-        <>
-          <SurveyTypeSelector value={surveyType} onChange={setSurveyType} />
+          <>
+            <SurveyTypeSelector value={surveyType} onChange={setSurveyType} />
 
-          {surveyType === "type1" && (
-            <Type1Form data={formData} setData={setFormData} />
-          )}
-          {surveyType === "type2" && (
-            <Type2Form data={formData} setData={setFormData} />
-          )}
-          {surveyType === "type3" && (
-            <Type3Form data={formData} setData={setFormData} />
-          )}
-          {surveyType === "type4" && (
-            <Type4Form data={formData} setData={setFormData} />
-          )}
+            {surveyType === "type1" && (
+              <Type1Form data={formData} setData={setFormData} />
+            )}
+            {surveyType === "type2" && (
+              <Type2Form data={formData} setData={setFormData} />
+            )}
+            {surveyType === "type3" && (
+              <Type3Form data={formData} setData={setFormData} />
+            )}
+            {surveyType === "type4" && (
+              <Type4Form data={formData} setData={setFormData} />
+            )}
 
-          <LanguageSelector
-            languages={supportedLanguages}
-            selected={languages}
-            onChange={setLanguages}
-          />
+            <LanguageSelector
+              languages={supportedLanguages}
+              selected={languages}
+              onChange={setLanguages}
+            />
 
-          <button
-            onClick={handleGenerate}
-            disabled={loading}
-            className="mt-4 px-4 py-2 bg-black text-white rounded"
-          >
-            {loading ? "Generating..." : "Generate Questions"}
-          </button>
-        </>
+            <button
+              onClick={handleGenerate}
+              disabled={loading}
+              className="mt-4 px-4 py-2 bg-black text-white rounded"
+            >
+              {loading ? "Generating..." : "Generate Questions"}
+            </button>
+          </>
         )}
       </div>
+
       {/* ================= REVIEW ================= */}
       {generatedSurvey && (
         <>
-          <div className="flex justify-between items-center mt-6">
+          {/* ✅ Survey Name Input */}
+          <div className="mt-6 mb-4">
+            <label className="block text-sm font-medium mb-1">
+              Survey Name
+            </label>
+            <input
+              type="text"
+              value={surveyName}
+              onChange={(e) => setSurveyName(e.target.value)}
+              placeholder="Enter survey name"
+              className="w-full border rounded px-3 py-2"
+            />
+          </div>
+
+          <div className="flex justify-between items-center mt-4">
             <h3 className="font-semibold">
               Questions Selected ({selectedQids.size}/
               {generatedSurvey.questions.length})
@@ -207,14 +244,18 @@ export default function GeneratorValidator() {
                     onChange={() => toggleQuestion(q.qid)}
                     className="mr-2"
                   />
-                  {q.text[previewLanguage]}
+                  {q.text?.[previewLanguage] ?? "[Question text missing]"}
                 </label>
 
-                <ul className="ml-6 list-disc">
-                  {q.options.map((o) => (
-                    <li key={o.id}>{o.label[previewLanguage]}</li>
-                  ))}
-                </ul>
+                {Array.isArray(q.options) && (
+                  <ul className="ml-6 list-disc">
+                    {q.options.map((o) => (
+                      <li key={o.id}>
+                        {o.label?.[previewLanguage] ?? "—"}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             ))}
           </div>
