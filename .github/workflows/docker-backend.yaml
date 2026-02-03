@@ -23,8 +23,8 @@ jobs:
       - name: Build & Push
         uses: docker/build-push-action@v5
         with:
-          context: backend/main
-          file: backend/main/Dockerfile
+          context: backend/main2
+          file: backend/main2/Dockerfile
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/narad-main
