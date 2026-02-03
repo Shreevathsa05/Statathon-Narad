@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL;
+const USER_LINK = import.meta.env.VITE_USER_LINK;
 
 const statusStyles = {
   active: "bg-green-100 text-green-700",
@@ -19,7 +20,7 @@ export default function Home() {
     axios
       .get(`${API_BASE}/api/survey`)
       .then((res) => setSurveys(res.data.data || []))
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   }, []);
 
@@ -39,7 +40,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-blue-50/30 to-white">
       {/* Hero Section */}
-      
+
 
       {/* Surveys Section */}
       <section className="max-w-7xl mx-auto px-6 pt-[1rem]">
@@ -47,7 +48,7 @@ export default function Home() {
           <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">
             Surveys
           </h2>
-          
+
         </div>
 
         {surveys.length === 0 ? (
@@ -59,7 +60,6 @@ export default function Home() {
             {surveys.map((s, index) => (
               <div
                 key={s.surveyId}
-                onClick={() => navigate(`/survey/${s.surveyId}`)}
                 className="group cursor-pointer bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-xl hover:border-blue-300 transition-all duration-300 hover:-translate-y-1"
                 style={{ animationDelay: `${index * 100}ms` }}
               >
@@ -91,10 +91,9 @@ export default function Home() {
 
                 <div className="flex items-center justify-between">
                   <span
-                    className={`px-3 py-1.5 text-xs font-medium rounded-full ${
-                      statusStyles[s.status] ||
+                    className={`px-3 py-1.5 text-xs font-medium rounded-full ${statusStyles[s.status] ||
                       "bg-gray-100 text-gray-600"
-                    }`}
+                      }`}
                   >
                     {s.status}
                   </span>
@@ -113,11 +112,37 @@ export default function Home() {
                     />
                   </svg>
                 </div>
-              </div>
-            ))}
-          </div>
+
+                <div className="mt-4 flex flex-col gap-2">
+                  <button
+                    onClick={() => navigate(`/survey-details/${s.surveyId}`)}
+                    className="w-full text-sm px-4 py-2 rounded-lg border border-blue-500 text-blue-600 hover:bg-blue-50 transition font-medium"
+                  >
+                    Details
+                  </button>
+
+                  <button
+                    onClick={() => navigate(`/survey-response/${s.surveyId}`)}
+                    className="w-full text-sm px-4 py-2 rounded-lg border border-green-500 text-green-600 hover:bg-green-50 transition font-medium"
+                  >
+                    Responses
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      window.open(`${USER_LINK}/survey/${s.surveyId}`, "_blank");
+                    }}
+                    className="w-full text-sm px-4 py-2 rounded-lg border border-purple-500 text-purple-600 hover:bg-purple-50 transition font-medium"
+                  >
+                    Live Survey
+                  </button>
+                </div>
+              </div >
+            ))
+            }
+          </div >
         )}
-      </section>
-    </div>
+      </section >
+    </div >
   );
 }

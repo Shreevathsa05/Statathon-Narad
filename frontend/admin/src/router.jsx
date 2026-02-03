@@ -4,6 +4,7 @@ import App from "./App";
 import Home from "./pages/Home";
 import GeneratorValidator from "./pages/Generator_validator";
 import SurveyViewer from "./pages/SurveyViewer";
+import SurveyResponsesPage from "./pages/SurveyResponsePage";
 
 export default function AppRoutes() {
   return (
@@ -11,7 +12,8 @@ export default function AppRoutes() {
       <Route element={<App />}>
         <Route path="/" element={<Home />} />
         <Route path="/generate" element={<GeneratorValidator />} />
-        <Route path="/survey/:surveyId" element={<SurveyViewer />} />
+        <Route path="/survey-details/:surveyId" element={<SurveyViewer />} />
+        <Route path="/survey-response/:surveyId" element={<SurveyResponsesPage />} />
       </Route>
     </Routes>
   );
