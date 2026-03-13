@@ -1,4 +1,4 @@
-import { triggerOutboundCall } from "../services/exotelService.js";
+import { triggerOutboundCall } from "../services/twilioService.js";
 import dotenv from "dotenv";
 
 dotenv.config();
