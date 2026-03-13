@@ -18,6 +18,7 @@ export const initiateCall = async (req, res) => {
 
     // The URL Exotel will hit exactly when the citizen answers the phone
     const webhookUrl = `${process.env.NGROK_URL}/api/survey/webhook/start`;
+    console.log("🔗 Sending this webhook URL to Twilio:", webhookUrl);
 
     const callData = await triggerOutboundCall(phoneNumber, webhookUrl);
 
