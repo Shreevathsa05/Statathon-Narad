@@ -7,6 +7,7 @@ import { fileURLToPath } from "url";
 
 // Important: Import the routes (we will build this file in Batch 2)
 import surveyRoutes from "./routes/surveyRoutes.js";
+import authRoutes from "./routes/authRoutes.js";
 
 dotenv.config();
 
@@ -27,6 +28,7 @@ app.use("/audio", express.static(path.join(__dirname, "public/audio")));
 
 // Mount the API routes
 app.use("/api/survey", surveyRoutes);
+app.use("/api/auth", authRoutes);
 
 // Health check endpoint
 app.get("/", (req, res) => {
