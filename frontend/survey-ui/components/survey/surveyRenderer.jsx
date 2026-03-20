@@ -10,15 +10,16 @@ import { speak } from "@/lib/textToSpeech";
 export default function SurveyRenderer({ questions, supportedLanguages, surveyId }) {
   const [answers, setAnswers] = useState({});
   const [loading, setLoading] = useState(false);
+  const [consent, setConsent] = useState(null);
 
   const [userInfo, setUserInfo] = useState({
     fullname: "",
     phone_no: "",
   });
+
   const [language, setLanguage] = useState("english");
   const router = useRouter();
   const [currentSpeak, setCurrentSpeak] = useState(null);
-
   const handleChange = (qid, value) => {
     setAnswers((prev) => ({ ...prev, [qid]: value }));
   };
@@ -29,6 +30,7 @@ export default function SurveyRenderer({ questions, supportedLanguages, surveyId
 
   const handleSpeakQuestion = async (field) => {
     if (!field.text?.[language]) return;
+
     setCurrentSpeak(field.qid);
     window.speechSynthesis.cancel();
 
@@ -44,82 +46,129 @@ export default function SurveyRenderer({ questions, supportedLanguages, surveyId
   };
 
   const handleSubmit = async () => {
-    if (loading) return
+    if (loading) return;
+
     if (!userInfo.fullname || !userInfo.phone_no) {
       alert("Please enter your name and phone number");
       return;
     }
 
     const response = questions
-      .filter((question) => shouldShowField(question, answers))
-      .map((question) => {
-        const answer = answers[question.qid];
+      .filter((q) => shouldShowField(q, answers))
+      .map((q) => {
+        const answer = answers[q.qid];
+        if (!answer) return null;
 
-        if (answer === undefined || answer === "") return null;
-
-        if (question.type === "mcq") {
-          return {
-            qid: question.qid,
-            optionId: answer,
-          };
-        }
-
-        if (question.type === "text" || question.type === "number") {
-          return {
-            qid: question.qid,
-            value: answer,
-          };
-        }
-
-        return null;
+        if (q.type === "mcq") return { qid: q.qid, optionId: answer };
+        return { qid: q.qid, value: answer };
       })
       .filter(Boolean);
 
     if (response.length === 0) {
       alert("No responses to submit");
-      setLoading(false);
       return;
     }
 
     setLoading(true);
 
     try {
-      const res = await fetch(
-        `${BASE_URL}/response/${surveyId}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            response,
-            user: userInfo,
-          }),
-        }
-      );
-
-      const json = await res.json();
+      const res = await fetch(`${BASE_URL}/response/${surveyId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ response, user: userInfo }),
+      });
 
       if (!res.ok) {
+        const json = await res.json();
         alert(json.message || "Submission failed");
         return;
       }
 
-      alert("Survey submitted successfully");
-      router.push("/")
-    } catch (err) {
-      console.error(err);
+      router.push("/");
+    } catch {
       alert("Something went wrong");
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="max-w-3xl mx-auto p-6 space-y-8">
-      {/* User Info */}
-      <section className="bg-white rounded-xl shadow p-6 space-y-4">
-        <h2 className="text-xl font-semibold">Respondent Details</h2>
+  const handleConsent = (val) => {
+    setConsent(val);
+    if (!val) {
+      router.push("/")
+    }
+  }
 
-        <div className="space-y-3">
+  /* ---------- CONSENT SCREEN ---------- */
+  if (consent === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="max-w-md w-full bg-white rounded-xl shadow p-6 space-y-4">
+          <h1 className="text-xl font-semibold text-gray-800">
+            Consent Required
+          </h1>
+
+          <p className="text-sm text-gray-600">
+            By continuing, you agree to participate in this survey and allow
+            your responses to be used for research purposes.
+          </p>
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => handleConsent(true)}
+              className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition"
+            >
+              I Agree
+            </button>
+            <button
+              onClick={() => handleConsent(false)}
+              className="flex-1 border py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition"
+            >
+              Decline
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (consent === false) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-gray-600">
+        Consent not provided.
+      </div>
+    );
+  }
+
+  /* ---------- SURVEY UI ---------- */
+  return (
+    <div className="bg-gray-50 min-h-screen">
+      {/* Header */}
+      <header className="sticky top-0 z-20 bg-white border-b">
+        <div className="max-w-3xl mx-auto px-6 py-4 flex justify-between items-center">
+          <h1 className="font-semibold text-gray-800">Survey Form</h1>
+
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            className="border rounded-md px-3 py-1.5 text-sm"
+          >
+            {supportedLanguages.map((l) => (
+              <option key={l} value={l}>
+                {l.charAt(0).toUpperCase() + l.slice(1)}
+              </option>
+            ))}
+          </select>
+        </div>
+      </header>
+
+      <main className="max-w-3xl mx-auto p-6 space-y-8">
+        {/* Respondent Info */}
+        <section className="bg-white rounded-xl shadow p-6 space-y-4">
+          <h2 className="font-medium text-gray-800">
+            Respondent Details
+          </h2>
+
           <input
             type="text"
             placeholder="Full Name"
@@ -139,86 +188,52 @@ export default function SurveyRenderer({ questions, supportedLanguages, surveyId
               handleUserChange("phone_no", e.target.value)
             }
           />
-        </div>
-      </section>
+        </section>
 
-      {/* Language Selector */}
-      {/* Top Bar */}
-      <div className="sticky top-0 z-10 bg-white border-b">
-        <div className="max-w-3xl mx-auto px-6 py-3 flex justify-between items-center">
-          <h1 className="text-lg font-semibold text-gray-700">
-            Survey Form
-          </h1>
+        {/* Questions */}
+        <section className="space-y-6">
+          {questions.map((field) => {
+            if (!shouldShowField(field, answers)) return null;
 
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">
-              Language:
-            </span>
-            <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              className="border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {supportedLanguages.map((l) => (
-                <option key={l} value={l}>
-                  {l.charAt(0).toUpperCase() + l.slice(1)}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Survey Questions */}
-      <section className="space-y-6">
-        {questions.map((field) => {
-          const visible = shouldShowField(field, answers);
-
-          if (!visible) {
-            return null;
-          }
-          
-          return (
-            <div
-              key={field.qid}
-              className={`
-                  transition-all duration-300 ease-in-out overflow-hidden
-                  ${visible ? "max-h-1/6 opacity-100 translate-y-0" : "max-h-0 opacity-0 -translate-y-2"}
-                `}
-            >
-              <div className="bg-white rounded-xl shadow p-0">
+            return (
+              <div
+                key={field.qid}
+                className="bg-white rounded-xl shadow p-5 space-y-3"
+              >
                 <DynamicField
                   field={field}
                   value={answers[field.qid]}
                   language={language}
                   onChange={handleChange}
                 />
-                <button
-                  type="button"
-                  onClick={() => handleSpeakQuestion(field)}
-                  className="p-2 rounded-full hover:bg-gray-100 transition"
-                  title="Read question"
-                >
-                  🔊
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </section>
 
-      {/* Submit */}
-      <div className="flex justify-end">
-        <button
-          onClick={handleSubmit}
-          disabled={loading}
-          className={`px-6 py-3 rounded-lg font-medium text-white transition
-            ${loading ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"}
-          `}
-        >
-          {loading ? "Submitting..." : "Submit Survey"}
-        </button>
-      </div>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => handleSpeakQuestion(field)}
+                    className="text-sm px-3 py-1 rounded-md border hover:bg-gray-100 transition"
+                  >
+                    🔊 Read
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </section>
+
+        {/* Submit */}
+        <div className="flex justify-end">
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className={`px-6 py-3 rounded-lg text-white font-medium transition
+              ${loading ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"}
+            `}
+          >
+            {loading ? "Submitting..." : "Submit Survey"}
+          </button>
+        </div>
+      </main>
     </div>
   );
 }

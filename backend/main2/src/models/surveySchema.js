@@ -75,7 +75,7 @@ const QuestionSchema = new Schema(
 
         type: {
             type: String,
-            enum: ["mcq", "text", "checkbox", "number"],
+            enum: ["mcq", "text", "checkbox"],
             required: true,
         },
 

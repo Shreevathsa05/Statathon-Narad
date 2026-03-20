@@ -188,27 +188,27 @@ export default function Home() {
               >
                 {/* Card Icon */}
                 <div className="flex justify-center items-baseline gap-[5rem]">
-                <div className="w-14 h-14  bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
-                  <svg
-                    className="w-7 h-7 text-blue-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
+                  <div className="w-14 h-14  bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                    <svg
+                      className="w-7 h-7 text-blue-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
+                    </svg>
 
-                  
 
-                </div>
-                <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-                  Active Since: <span className="font-mono">{survey.createdAt?survey.createdAt:"time will be here"}</span>
-                </p>
+
+                  </div>
+                  <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                    Active Since: <span className="font-mono">{survey.createdAt ? survey.createdAt : "time will be here"}</span>
+                  </p>
                 </div>
 
                 {/* Card Content */}
@@ -230,18 +230,16 @@ export default function Home() {
                 {/* Status Badge */}
                 <div className="flex items-center justify-between">
                   <span
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-300 ${
-                      survey.status === "active"
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-300 ${survey.status === "active"
                         ? "bg-green-100 text-green-700 group-hover:bg-green-200"
                         : "bg-blue-100 text-blue-700 group-hover:bg-blue-200"
-                    }`}
+                      }`}
                   >
                     <span
-                      className={`w-1.5 h-1.5 rounded-full ${
-                        survey.status === "active"
+                      className={`w-1.5 h-1.5 rounded-full ${survey.status === "active"
                           ? "bg-green-500 animate-pulse"
                           : "bg-blue-500"
-                      }`}
+                        }`}
                     ></span>
                     {survey.status}
                   </span>
