@@ -1,91 +1,95 @@
-import mongoose, { Schema } from "mongoose"
+//Survey Response Schema
+import { Schema } from "mongoose";
 
-export const userInfoSchema = new Schema(
-    {
-        fullname: {
+const UserInfoSchema = new mongoose.Schema({
+    fullname: {
+        type: String,
+        required: true,
+        trim: true
+    },
+    phone_no: {
+        type: String,
+        required: true
+    },
+}, { _id: false });
+
+const ParaInfoSchema = new mongoose.Schema({
+    latitude: {
+        type: String,
+        required: true
+    },
+    longitude: {
+        type: String,
+        required: true
+    },
+    deviceInfo: {
+        os: {
             type: String,
-            required: true,
-            trim: true
+            default: "unknown"
         },
-        phone_no: {
+    },
+    interviewInfo: {
+        interviewMode: {
             type: String,
             required: true
         },
-        // adharNo:
-    },
-    {
-        _id: false
-    }
-);
-
-export const paraInfoSchema = new Schema(
-    {
-        location: {
-            type: {
-                type: String,
-                enum: ["Point"],
-                default: "Point"
-            },
-            coordinates: {
-                type: [Number], // [longitude, latitude]
-            },
-            accuracyMeters: Number
+        interviewDurationMinutes: {
+            type: Number,
+            required: true
         },
-
-        deviceInfo: {
-            deviceType: String,        // mobile / tablet / desktop
-            os: String,                // Android / iOS / Windows
-            browserOrApp: String,      // Chrome / App
-            interviewMode: {
-                type: String,
-                enum: ["CAPI", "CATI", "CAWI"],
-            }
-        }
     },
-    {
-        _id: false
+    lgdInfo: {
+        stateCode: {
+            type: String,
+            required: true
+        },
+        districtCode: {
+            type: String,
+            required: true
+        },
+        shortNameOfDistrict: {
+            type: String,
+            required: true
+        },
+    },
+    samplingInfo: {
+        nssRegionCode: {
+            type: Number,
+            required: true
+        },
     }
-);
+}, { _id: false });
 
-const responseItemSchema = new Schema(
-  {
+const ResponseSchema = new mongoose.Schema({
     qid: {
-      type: String,
-      required: true,
+        type: String,
+        required: true,
     },
     optionId: {
-      type: String,
+        type: String,
     },
     value: {
-      type: Schema.Types.Mixed, // string | number
+        type: Schema.Types.Mixed,
     },
-  },
-  { _id: false } // ✅ IMPORTANT
-);
+}, { _id: false });
 
-const surveyResponseSchema = new Schema(
-  {
+const SurveyResponseSchema = new mongoose.Schema({
+
     surveyId: {
-      type: String,
-      required: true,
-      index: true,
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Survey",
+        required: true
     },
-    user: {
-      type: userInfoSchema,
-      required: true,
+    surveyVersion: {
+        type: Number,
+        default: 1
     },
-    paraInfo: {
-      type: paraInfoSchema,
-    },
-    response: {
-      type: [responseItemSchema],
-      required: true,
-    },
-  },
-  {
-    timestamps: true,
-    strict: true,
-  }
-);
 
-export const SurveyResponse = mongoose.model("SurveyResponse", surveyResponseSchema);
+    userInfo: UserInfoSchema,
+
+    paraInfo: ParaInfoSchema,
+
+    responses: [ResponseSchema],
+}, { timestamps: true });
+
+export default mongoose.model("SurveyResponse", SurveyResponseSchema);
