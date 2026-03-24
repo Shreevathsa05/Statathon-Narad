@@ -12,19 +12,20 @@ const llm_chat=new ChatOpenAI({
         baseURL:process.env.CHAT_MODEL_BASEURL,
     },
 });
-// stt
+// stt - (groq)
 
 // tts
 const tts = new SarvamAIClient({
   apiSubscriptionKey: process.env.SARVAM_API_KEY
 });
 
-// iffi test
-
-(async()=>{
-    const a= await llm_chat.invoke("generate a sample structured json response for set of data on climate vs rain");
-    console.log(a);
-})()
+// ---------------------------------------------------------
+//                       iffi test
+// ---------------------------------------------------------
+// (async()=>{
+//     const a= await llm_chat.invoke("generate a sample structured json response for set of data on climate vs rain provide only json no other text or any wasteful character");
+//     console.log(a);
+// })()
 
 // (async()=>{
 //     const a= await tts.textToSpeech;
