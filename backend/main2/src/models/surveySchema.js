@@ -1,5 +1,20 @@
 import mongoose from "mongoose";
 
+const LANGUAGES = [
+    "hindi",
+    "english",
+    "bengali",
+    "telugu",
+    "tamil",
+    "marathi",
+    "gujarati",
+    "kannada",
+    "malayalam",
+    "odia",
+    "punjabi",
+    "urdu",
+];
+
 const ShowIfSchema = new mongoose.Schema({
     questionId: {
         type: String,
@@ -22,21 +37,6 @@ const OptionSchema = new mongoose.Schema({
         required: true
     }
 }, { _id: false });
-
-const questionSectionSchema = new mongoose.Schema({
-    sectionName: {
-        type: String,
-        required: true
-    },
-    questions: {
-        type: [QuestionSchema],
-        required: true,
-        validate: {
-            validator: (v) => Array.isArray(v) && v.length >= 1,
-            message: "Survey must have at least one question",
-        },
-    }
-});
 
 const QuestionSchema = new mongoose.Schema({
 
@@ -91,6 +91,21 @@ const QuestionSchema = new mongoose.Schema({
     },
 }, { _id: false });
 
+const questionSectionSchema = new mongoose.Schema({
+    sectionName: {
+        type: String,
+        required: true
+    },
+    questions: {
+        type: [QuestionSchema],
+        required: true,
+        validate: {
+            validator: (v) => Array.isArray(v) && v.length >= 1,
+            message: "Survey must have at least one question",
+        },
+    }
+}, { _id: false });
+
 const SurveySchema = new mongoose.Schema({
     surveyId: {
         type: String,
@@ -139,4 +154,4 @@ const SurveySchema = new mongoose.Schema({
     timestamps: true,
 });
 
-export default mongoose.model("Survey", SurveySchema);
+export const Survey = mongoose.model("Survey", SurveySchema);
