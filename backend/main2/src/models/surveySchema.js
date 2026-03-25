@@ -85,6 +85,11 @@ const QuestionSchema = new mongoose.Schema({
         },
     },
 
+    prefill: {
+        type: String,
+        required: false
+    },
+
     showIf: {
         type: ShowIfSchema,
         required: false

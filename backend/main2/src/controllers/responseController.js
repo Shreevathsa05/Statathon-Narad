@@ -41,18 +41,18 @@ export const submitSurveyResponse = asyncHandler(async (req, res) => {
 
         // ---- MCQ ----
         if (question.type === "mcq") {
-            if (!ans.optionId) {
+            if (!ans.answer) {
                 throw new ApiError(
                     400,
-                    `optionId is required for MCQ question ${ans.qid}`
+                    `answer is required for MCQ question ${ans.qid}`
                 );
             }
 
             const validOptions = question.options.map(o => o.id);
-            if (!validOptions.includes(ans.optionId)) {
+            if (!validOptions.includes(ans.answer)) {
                 throw new ApiError(
                     400,
-                    `Invalid optionId ${ans.optionId} for question ${ans.qid}`
+                    `Invalid answer ${ans.answer} for question ${ans.qid}`
                 );
             }
         }
@@ -60,19 +60,19 @@ export const submitSurveyResponse = asyncHandler(async (req, res) => {
         // ---- TEXT ----
         if (question.type === "text") {
             if (
-                typeof ans.value !== "string" ||
-                ans.value.trim().length === 0
+                typeof ans.answer !== "string" ||
+                ans.answer.trim().length === 0
             ) {
                 throw new ApiError(
                     400,
-                    `Valid text value required for question ${ans.qid}`
+                    `Valid text answer required for question ${ans.qid}`
                 );
             }
         }
 
         // ---- CHECKBOX ----
         if (question.type === "checkbox") {
-            if (!Array.isArray(ans.value) || ans.value.length === 0) {
+            if (!Array.isArray(ans.answer) || ans.answer.length === 0) {
                 throw new ApiError(
                     400,
                     `Checkbox must have at least one option selected for ${ans.qid}`
@@ -81,7 +81,7 @@ export const submitSurveyResponse = asyncHandler(async (req, res) => {
 
             const validOptions = question.options.map(o => o.id);
 
-            for (const optId of ans.value) {
+            for (const optId of ans.answer) {
                 if (!validOptions.includes(optId)) {
                     throw new ApiError(
                         400,

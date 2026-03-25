@@ -1,5 +1,5 @@
 //Survey Response Schema
-import mongoose from "mongoose";
+import mongoose, { Schema } from "mongoose";
 
 const UserInfoSchema = new mongoose.Schema({
     fullname: {
@@ -65,10 +65,7 @@ const ResponseSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
-    optionId: {
-        type: String,
-    },
-    value: {
+    answer: {
         type: mongoose.Schema.Types.Mixed,
     },
 }, { _id: false });
