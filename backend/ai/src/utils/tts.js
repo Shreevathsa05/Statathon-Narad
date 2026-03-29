@@ -1,7 +1,7 @@
-import { llm_chat, stt, tts } from '../models/llms.js'
+import { llm_chat, stt, sarvam_voice } from '../models/llms.js'
 
-export async function tts_generate(text, lang_code) {
-    const res = await tts.textToSpeech.convert({
+export async function sarvam_voice_generate(text, lang_code) {
+    const res = await sarvam_voice.textToSpeech.convert({
         text: text,
         model: "bulbul:v3",
         speaker: "shubh",

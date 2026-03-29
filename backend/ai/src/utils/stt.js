@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 import fs from "fs";
-import { stt, tts } from "../models/llms.js";
+import { stt, sarvam_voice } from "../models/llms.js";
 
 dotenv.config();
 
@@ -58,7 +58,7 @@ export async function stt_from_twilio_sarvam(url) {
         const recordingSid = match[1];
         filename = await downloadRecording(recordingSid);
 
-        transcription = await tts.speechToText.transcribe({
+        transcription = await sarvam_voice.speechToText.transcribe({
             file: fs.createReadStream(filename),
             model: "saaras:v3",
             mode: "transcribe"
@@ -67,8 +67,8 @@ export async function stt_from_twilio_sarvam(url) {
     } catch (error) {
         fs.unlinkSync(filename);
     }
-    // console.log("transcription", transcription);
+    console.log("transcription", transcription);
     return transcription;
 }
 
-// stt_from_twilio("https://api.twilio.com/2010-04-01/Accounts/AC17f953871067960b071d0468041b81d9/Recordings/REce7e4e5e8bb053c39d9c56a1453e4eb8");
+stt_from_twilio_whisper("https://api.twilio.com/2010-04-01/Accounts/AC17f953871067960b071d0468041b81d9/Recordings/REce7e4e5e8bb053c39d9c56a1453e4eb8");

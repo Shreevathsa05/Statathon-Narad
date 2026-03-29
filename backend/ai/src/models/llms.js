@@ -26,36 +26,9 @@ const stt = async (filename = "audio.m4a") => {
   return transcription.text;
 };
 
-// tts
-const tts = new SarvamAIClient({
+// tts and stt
+const sarvam_voice = new SarvamAIClient({
   apiSubscriptionKey: process.env.SARVAM_API_KEY
 });
 
-export { llm_chat, stt, tts }
-
-// ---------------------------------------------------------
-//                       iffi test
-// ---------------------------------------------------------
-// (async () => {
-//   try {
-//     const res = await tts.textToSpeech.convert({
-//       text: "Hello, this is a test generation.",
-//       model: "bulbul:v3",
-//       speaker: "shubh",
-//       target_language_code: "hi-IN"
-//     });
-//     console.log("TTS Response:", res);
-//   } catch (error) {
-//     console.error("TTS Error:", error);
-//   }
-// })();
-
-// (async () => {
-//   try {
-//     const dummyBlob = new Blob(["dummy audio data"], { type: "audio/m4a" });
-//     const res = await stt(dummyBlob, "test_audio.m4a");
-//     console.log("STT Response:", res);
-//   } catch (error) {
-//     console.error("STT Error:", error);
-//   }
-// })();
+export { llm_chat, stt, sarvam_voice }
