@@ -1,7 +1,7 @@
 import { Router } from "express"
-import { getSurveyResponseById, submitSurveyResponse } from "../methods/responseController.js";
+import { getAllSurveyResponseBySurveyId, submitSurveyResponse } from "../controllers/responseController.js";
 
 const router = Router();
-router.route("/:survey_id").get(getSurveyResponseById).post(submitSurveyResponse);
+router.route("/:survey_id").get(getAllSurveyResponseBySurveyId).post(submitSurveyResponse);
 
 export default router;
