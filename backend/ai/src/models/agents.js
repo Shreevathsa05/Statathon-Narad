@@ -8,6 +8,7 @@ import { SurveyGenSchema } from "../schema/questionSchema.js";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 // context collector agent
 export async function context_collector_agent(user_input) {
+    console.log("Context Collector Agent Started");
     const collector = createAgent({
         model: llm_chat,
         tools: mcp_tools,
@@ -24,18 +25,18 @@ export async function context_collector_agent(user_input) {
     });
 
     const final = getFinalMessage(res.messages);
-
+    console.log("Context Collector Agent Completed");
     return final;
 }
 
 function getFinalMessage(messages) {
     return messages[messages.length - 1].content;
 }
-// const a = await context_collector_agent("Generate a survey for consumption study number of questions");
-// console.log(a);
 
 
 export async function summarizer_agent(user_input, context_extracted) {
+    console.log("Summarizer Agent");
+
     const summarizer = createAgent({
         model: llm_chat,
         tools: mcp_tools,
@@ -48,12 +49,14 @@ export async function summarizer_agent(user_input, context_extracted) {
             }
         ]
     });
-    console.log(res);
+
+    console.log("Summarizer Agent Completed");
     return res;
 }
 
 export async function question_generator_agent(user_input, context_summarized) {
-    // const structured_llm = llm_chat.withStructuredOutput(SurveyGenSchema)
+    console.log("Question Generator Agent");
+
     const structured_llm = new ChatGoogleGenerativeAI({
         model: "gemini-3-flash-preview",
         apiKey: process.env.GOOGLE_API_KEY,
@@ -61,6 +64,8 @@ export async function question_generator_agent(user_input, context_summarized) {
     })
 
     const questions = await llm_chat.invoke(`${question_generator_system_prompt}\n Form should be based on following:- \nTopic: ${user_input} \n MOSPI extracted Context: ${context_summarized}`);
-    console.log(questions);
+
+    console.log("Question Generator Agent Completed");
     return questions;
 }
+

@@ -29,7 +29,6 @@ You are a survey generator. Your sole job is to generate a survey based on the u
 - Output must match the provided JSON schema exactly
 - Do not add extra characters allowed outside json.
 - showIf.questionId must reference an existing qid
-- Follow the Schema strictly.
 
 Output Schema:
 z.discriminatedUnion("type", [
