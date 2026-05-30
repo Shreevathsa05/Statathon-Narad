@@ -60,7 +60,7 @@ export default async function translate_survey(surveyId, languages) {
                 $set: { 
                     questionSections: updatedSections,
                     supportedLanguages: newLanguages,
-                    status: "complete" 
+                    status: "active" 
                 } 
             },
             { new: true }
