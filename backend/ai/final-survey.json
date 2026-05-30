@@ -1,0 +1,466 @@
+{
+    "_id": "6a1a644b148e06813e7aa0c5",
+    "surveyId": "test-survey-123",
+    "__v": 0,
+    "categories": [
+        "AI Generated"
+    ],
+    "createdAt": "2026-05-30T04:15:07.334Z",
+    "createdBy": "AI-Agent",
+    "name": "Survey on unemployment rate in rural and urban areas",
+    "questionSections": [
+        {
+            "sectionName": "Demographics",
+            "questions": [
+                {
+                    "qid": "q1",
+                    "type": "text",
+                    "text": {
+                        "english": "What is the age group of the respondent?"
+                    },
+                    "prefill": "All",
+                    "options": []
+                },
+                {
+                    "qid": "q2",
+                    "type": "mcq",
+                    "text": {
+                        "english": "What is the gender of the respondent?"
+                    },
+                    "options": [
+                        {
+                            "id": "opt1",
+                            "label": {
+                                "english": "Male"
+                            }
+                        },
+                        {
+                            "id": "opt2",
+                            "label": {
+                                "english": "Female"
+                            }
+                        },
+                        {
+                            "id": "opt3",
+                            "label": {
+                                "english": "Other"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "qid": "q3",
+                    "type": "mcq",
+                    "text": {
+                        "english": "What is the location of the respondent?"
+                    },
+                    "options": [
+                        {
+                            "id": "opt4",
+                            "label": {
+                                "english": "Rural"
+                            }
+                        },
+                        {
+                            "id": "opt5",
+                            "label": {
+                                "english": "Urban"
+                            }
+                        },
+                        {
+                            "id": "opt6",
+                            "label": {
+                                "english": "Combined (Rural + Urban)"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "sectionName": "Overall Employment Status",
+            "questions": [
+                {
+                    "qid": "q1",
+                    "type": "mcq",
+                    "text": {
+                        "english": "What is your current employment status?"
+                    },
+                    "options": [
+                        {
+                            "id": "opt1",
+                            "label": {
+                                "english": "Employed"
+                            }
+                        },
+                        {
+                            "id": "opt2",
+                            "label": {
+                                "english": "Unemployed"
+                            }
+                        },
+                        {
+                            "id": "opt3",
+                            "label": {
+                                "english": "Not in labour force"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "qid": "q2",
+                    "type": "text",
+                    "text": {
+                        "english": "Please describe any recent changes in your employment status."
+                    },
+                    "options": []
+                },
+                {
+                    "qid": "q3",
+                    "type": "checkbox",
+                    "text": {
+                        "english": "Which sectors have you worked in during the last year?"
+                    },
+                    "options": [
+                        {
+                            "id": "optA",
+                            "label": {
+                                "english": "Agriculture"
+                            }
+                        },
+                        {
+                            "id": "optB",
+                            "label": {
+                                "english": "Manufacturing"
+                            }
+                        },
+                        {
+                            "id": "optC",
+                            "label": {
+                                "english": "Services"
+                            }
+                        },
+                        {
+                            "id": "optD",
+                            "label": {
+                                "english": "Construction"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "sectionName": "Rural vs Urban Unemployment",
+            "questions": [
+                {
+                    "qid": "q1",
+                    "type": "mcq",
+                    "text": {
+                        "english": "In which month did the rural unemployment rate (sector_code = 1) reach its highest value in 2025?"
+                    },
+                    "options": [
+                        {
+                            "id": "opt1",
+                            "label": {
+                                "english": "April"
+                            }
+                        },
+                        {
+                            "id": "opt2",
+                            "label": {
+                                "english": "May"
+                            }
+                        },
+                        {
+                            "id": "opt3",
+                            "label": {
+                                "english": "June"
+                            }
+                        },
+                        {
+                            "id": "opt4",
+                            "label": {
+                                "english": "July"
+                            }
+                        }
+                    ],
+                    "prefill": "May",
+                    "showIf": {
+                        "questionId": "q0",
+                        "equals": "overall"
+                    }
+                },
+                {
+                    "qid": "q2",
+                    "type": "text",
+                    "text": {
+                        "english": "Compare the average monthly unemployment rate for rural and urban areas in 2025. Provide the difference (percentage points)."
+                    },
+                    "options": []
+                },
+                {
+                    "qid": "q3",
+                    "type": "checkbox",
+                    "text": {
+                        "english": "Select all months where the urban unemployment rate (sector_code = 2) was above 5.5 %."
+                    },
+                    "options": [
+                        {
+                            "id": "optA",
+                            "label": {
+                                "english": "April"
+                            }
+                        },
+                        {
+                            "id": "optB",
+                            "label": {
+                                "english": "May"
+                            }
+                        },
+                        {
+                            "id": "optC",
+                            "label": {
+                                "english": "June"
+                            }
+                        },
+                        {
+                            "id": "optD",
+                            "label": {
+                                "english": "July"
+                            }
+                        },
+                        {
+                            "id": "optE",
+                            "label": {
+                                "english": "August"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "sectionName": "Seasonal and Trend Analysis",
+            "questions": [
+                {
+                    "qid": "q1",
+                    "type": "mcq",
+                    "text": {
+                        "english": "Did the overall unemployment rate in rural + urban areas increase in the most recent month compared to the previous month?"
+                    },
+                    "options": [
+                        {
+                            "id": "opt1",
+                            "label": {
+                                "english": "Yes"
+                            }
+                        },
+                        {
+                            "id": "opt2",
+                            "label": {
+                                "english": "No"
+                            }
+                        },
+                        {
+                            "id": "opt3",
+                            "label": {
+                                "english": "No change"
+                            }
+                        }
+                    ],
+                    "showIf": {
+                        "questionId": "q1",
+                        "equals": "Yes"
+                    }
+                },
+                {
+                    "qid": "q2",
+                    "type": "text",
+                    "text": {
+                        "english": "Please describe any seasonal pattern you notice in the unemployment rate over the past year."
+                    },
+                    "options": []
+                },
+                {
+                    "qid": "q3",
+                    "type": "checkbox",
+                    "text": {
+                        "english": "Select the months where the unemployment rate exceeded 5.5 %."
+                    },
+                    "options": [
+                        {
+                            "id": "optA",
+                            "label": {
+                                "english": "April"
+                            }
+                        },
+                        {
+                            "id": "optB",
+                            "label": {
+                                "english": "May"
+                            }
+                        },
+                        {
+                            "id": "optC",
+                            "label": {
+                                "english": "June"
+                            }
+                        },
+                        {
+                            "id": "optD",
+                            "label": {
+                                "english": "July"
+                            }
+                        },
+                        {
+                            "id": "optE",
+                            "label": {
+                                "english": "August"
+                            }
+                        },
+                        {
+                            "id": "optF",
+                            "label": {
+                                "english": "September"
+                            }
+                        },
+                        {
+                            "id": "optG",
+                            "label": {
+                                "english": "October"
+                            }
+                        },
+                        {
+                            "id": "optH",
+                            "label": {
+                                "english": "December"
+                            }
+                        },
+                        {
+                            "id": "optI",
+                            "label": {
+                                "english": "November"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "sectionName": "Policy and External Factors",
+            "questions": [
+                {
+                    "qid": "Q001",
+                    "type": "mcq",
+                    "text": {
+                        "english": "Which policy change in 2025 do you think most impacted unemployment?"
+                    },
+                    "options": [
+                        {
+                            "id": "A",
+                            "label": {
+                                "english": "New skill development scheme"
+                            }
+                        },
+                        {
+                            "id": "B",
+                            "label": {
+                                "english": "Rural employment guarantee expansion"
+                            }
+                        },
+                        {
+                            "id": "C",
+                            "label": {
+                                "english": "Tax incentive for MSMEs"
+                            }
+                        },
+                        {
+                            "id": "D",
+                            "label": {
+                                "english": "None of the above"
+                            }
+                        }
+                    ],
+                    "showIf": {
+                        "questionId": "Q000",
+                        "equals": "Yes"
+                    }
+                },
+                {
+                    "qid": "Q002",
+                    "type": "mcq",
+                    "text": {
+                        "english": "Have you observed any impact of monsoon rainfall on employment?"
+                    },
+                    "options": [
+                        {
+                            "id": "Y",
+                            "label": {
+                                "english": "Yes"
+                            }
+                        },
+                        {
+                            "id": "N",
+                            "label": {
+                                "english": "No"
+                            }
+                        },
+                        {
+                            "id": "U",
+                            "label": {
+                                "english": "Unsure"
+                            }
+                        }
+                    ],
+                    "showIf": {
+                        "questionId": "Q001",
+                        "equals": "Yes"
+                    }
+                },
+                {
+                    "qid": "Q003",
+                    "type": "mcq",
+                    "text": {
+                        "english": "Which external factor do you consider most relevant to recent unemployment fluctuations?"
+                    },
+                    "options": [
+                        {
+                            "id": "A",
+                            "label": {
+                                "english": "Global oil price changes"
+                            }
+                        },
+                        {
+                            "id": "B",
+                            "label": {
+                                "english": "Domestic monsoon variability"
+                            }
+                        },
+                        {
+                            "id": "C",
+                            "label": {
+                                "english": "Government fiscal policy"
+                            }
+                        },
+                        {
+                            "id": "D",
+                            "label": {
+                                "english": "Technological automation"
+                            }
+                        }
+                    ],
+                    "showIf": {
+                        "questionId": "Q002",
+                        "equals": "Yes"
+                    }
+                }
+            ]
+        }
+    ],
+    "status": "pending",
+    "supportedLanguages": [
+        "english"
+    ],
+    "updatedAt": "2026-05-30T04:20:13.766Z"
+}

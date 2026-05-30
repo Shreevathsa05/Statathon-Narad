@@ -1,0 +1,175 @@
+{
+  "info": {
+    "name": "Statathon-Narad AI Backend",
+    "description": "Collection for testing the async Question Generation API endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Question Generation",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/question-generation/",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "question-generation",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "1. Generate Questions (Init)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"user_query\": \"unemployment rate in rural and urban areas\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:3000/question-generation/generate_questions_english",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "question-generation",
+                "generate_questions_english"
+              ]
+            }
+          }
+        },
+        {
+          "name": "2. Poll Questions (Fetch)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/question-generation/poll_questions_english/<PASTE_SURVEY_ID_HERE>",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "question-generation",
+                "poll_questions_english",
+                "<PASTE_SURVEY_ID_HERE>"
+              ]
+            }
+          }
+        },
+        {
+          "name": "3. Improve Section (Regenerate)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"surveyId\": \"<PASTE_SURVEY_ID_HERE>\",\r\n  \"sectionName\": \"Demographics\",\r\n  \"instructions\": \"Add one more question about education level and remove the state question.\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:3000/question-generation/improve_section_english",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "question-generation",
+                "improve_section_english"
+              ]
+            }
+          }
+        },
+        {
+          "name": "4. Generate Multilang Questions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"surveyId\": \"<PASTE_SURVEY_ID_HERE>\",\r\n  \"languages\": [\"hindi\", \"marathi\"]\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:3000/question-generation/generate_questions_multilang",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "question-generation",
+                "generate_questions_multilang"
+              ]
+            }
+          }
+        },
+        {
+          "name": "5. Poll Multilang Questions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/question-generation/poll_questions_multilang/<PASTE_SURVEY_ID_HERE>",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "question-generation",
+                "poll_questions_multilang",
+                "<PASTE_SURVEY_ID_HERE>"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

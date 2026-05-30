@@ -1,29 +1,20 @@
-import 'dotenv/config';
-import app from './app.js';
+import "dotenv/config";
+import app from "./app.js";
+import connectDB from "./src/mongodb/connect.js";
+
 const PORT = process.env.PORT || 3000;
 
-import { Worker } from "worker_threads";
+async function startServer() {
+    try {
+        await connectDB();
 
-function runWorker(taskData) {
-    return new Promise((resolve, reject) => {
-        const worker = new Worker('./workers.js', { workerData: taskData });
-        worker.on('message', resolve);
-        worker.on('error', reject);
-        worker.on('exit', code => {
-            if (code !== 0) reject(new Error(`Worker stopped with code ${code}`));
+        app.listen(PORT, () => {
+            console.log(`Server listening on ${PORT}`);
         });
-    });
+    } catch (error) {
+        console.error("Failed to start application:", error);
+        process.exit(1);
+    }
 }
 
-app.listen(PORT, async () => {
-    console.log(`server listening on ${PORT}`);
-    
-    // Call the worker so it actually runs!
-    try {
-        console.log("Starting worker...");
-        const result = await runWorker({ number: 5 });
-        console.log("Worker returned result:", result);
-    } catch (err) {
-        console.error("Worker failed:", err);
-    }
-})
+startServer();
