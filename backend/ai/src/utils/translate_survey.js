@@ -14,7 +14,7 @@ export default async function translate_survey(surveyId, languages) {
 
         for (const section of survey.questionSections) {
             console.log(`Translating section: ${section.sectionName}`);
-            
+
             let translatedQuestions = null;
             let attempts = 0;
             const maxAttempts = 3;
@@ -22,7 +22,7 @@ export default async function translate_survey(surveyId, languages) {
             while (attempts < maxAttempts) {
                 try {
                     translatedQuestions = await multilang_translator_agent(section.questions, languages);
-                    
+
                     if (Array.isArray(translatedQuestions) && translatedQuestions.length > 0) {
                         break; // Success
                     } else {
@@ -50,18 +50,18 @@ export default async function translate_survey(surveyId, languages) {
         }
 
         console.log(`Saving translated survey to MongoDB...`);
-        
+
         // Add new languages to supportedLanguages without duplicates
         const newLanguages = Array.from(new Set([...survey.supportedLanguages, ...languages]));
 
         const updatedSurvey = await Survey.findOneAndUpdate(
             { surveyId },
-            { 
-                $set: { 
+            {
+                $set: {
                     questionSections: updatedSections,
                     supportedLanguages: newLanguages,
-                    status: "active" 
-                } 
+                    status: "pending"
+                }
             },
             { new: true }
         );
@@ -71,12 +71,12 @@ export default async function translate_survey(surveyId, languages) {
 
     } catch (error) {
         console.error("Error during survey translation:", error);
-        
+
         // Revert status on critical failure
         try {
             await Survey.findOneAndUpdate({ surveyId }, { $set: { status: "complete" } });
-        } catch(e) {}
-        
+        } catch (e) { }
+
         throw error;
     }
 }

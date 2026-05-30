@@ -62,7 +62,7 @@ export async function generate_english_questions(user_input, surveyId) {
     const surveyData = {
         surveyId: id,
         name: `Survey on ${user_input}`.substring(0, 100),
-        status: "complete",
+        status: "pending",
         supportedLanguages: ["english"],
         questionSections: questionSections,
         categories: ["AI Generated"],
