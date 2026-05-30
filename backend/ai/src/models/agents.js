@@ -1,17 +1,22 @@
 // agents and their integerations here
-import { llm_chat, gemini } from "./llms.js";
-import { mcp_tools } from "../tools/multi_mcp_client.js"
-import { createAgent, HumanMessage } from "langchain";
-import { context_collector_system_prompt, summarizer_system_prompt, question_generator_system_prompt } from "../prompts/question_generation/index.js";
-import fs from "fs";
-import { SurveyGenSchema } from "../schema/questionSchema.js";
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { llm_chat } from "./llms.js";
+import { mcp_tools } from "../tools/multi_mcp_client.js";
+import { createAgent } from "langchain";
+import { 
+    context_collector_system_prompt, 
+    section_planner_system_prompt, 
+    question_generator_system_prompt,
+    improve_section_system_prompt_english,
+    multilang_translator_system_prompt
+} from "../prompts/question_generation/index.js";
+
 // context collector agent
 export async function context_collector_agent(user_input) {
+    console.log("Context Collector Agent Started");
     const collector = createAgent({
         model: llm_chat,
         tools: mcp_tools,
-        max_iterations: 3,
+        max_iterations: 10,
     });
 
     const res = await collector.invoke({
@@ -24,43 +29,206 @@ export async function context_collector_agent(user_input) {
     });
 
     const final = getFinalMessage(res.messages);
-
+    console.log("Context Collector Agent Completed");
     return final;
 }
 
 function getFinalMessage(messages) {
     return messages[messages.length - 1].content;
 }
-// const a = await context_collector_agent("Generate a survey for consumption study number of questions");
-// console.log(a);
 
-
-export async function summarizer_agent(user_input, context_extracted) {
-    const summarizer = createAgent({
+// section planner agent
+export async function section_planner_agent(user_input, context_extracted) {
+    console.log("Section Planner Agent Started");
+    
+    const planner = createAgent({
         model: llm_chat,
         tools: mcp_tools,
+        max_iterations: 3,
     });
-    const res = await summarizer.invoke({
+
+    const res = await planner.invoke({
         messages: [
             {
                 role: "user",
-                content: `${summarizer_system_prompt}\n User Input: ${user_input} \n Context Extracted:- ${context_extracted}`
+                content: `${section_planner_system_prompt}\n\nUser Input: ${user_input}\nContext Extracted: ${context_extracted}`
             }
         ]
     });
-    console.log(res);
-    return res;
+
+    console.log("Section Planner Agent Completed");
+    
+    let content = getFinalMessage(res.messages);
+    
+    console.log("=== RAW PLANNER RESPONSE ===");
+    console.log(content);
+    console.log("============================");
+
+    if (typeof content === "string") {
+        content = content.replace(/```json/gi, "").replace(/```/g, "").trim();
+        try {
+            let parsed = JSON.parse(content);
+            if (parsed && !Array.isArray(parsed)) {
+                const keys = Object.keys(parsed);
+                if (keys.length === 1 && Array.isArray(parsed[keys[0]])) {
+                    parsed = parsed[keys[0]];
+                } else if (parsed.sections && Array.isArray(parsed.sections)) {
+                    parsed = parsed.sections;
+                }
+            }
+            return parsed;
+        } catch (e) {
+            console.error("Failed to parse section planner JSON:", e);
+            console.log("Returning raw content due to parse failure.");
+            return content;
+        }
+    }
+    return content;
 }
 
-export async function question_generator_agent(user_input, context_summarized) {
-    // const structured_llm = llm_chat.withStructuredOutput(SurveyGenSchema)
-    const structured_llm = new ChatGoogleGenerativeAI({
-        model: "gemini-3-flash-preview",
-        apiKey: process.env.GOOGLE_API_KEY,
-        temperature: 0,
-    })
+// question generator agent
+export async function question_generator_agent(user_input, context_summarized, section) {
+    console.log(`Question Generator Agent Started for section: ${section.sectionName}`);
 
-    const questions = await llm_chat.invoke(`${question_generator_system_prompt}\n Form should be based on following:- \nTopic: ${user_input} \n MOSPI extracted Context: ${context_summarized}`);
-    console.log(questions);
-    return questions;
+    const generator = createAgent({
+        model: llm_chat,
+        tools: mcp_tools,
+        max_iterations: 3,
+    });
+
+    const res = await generator.invoke({
+        messages: [
+            {
+                role: "user",
+                content: `${question_generator_system_prompt}\n\nTopic: ${user_input}\nMOSPI extracted Context: ${context_summarized}\n\nSection to Generate: ${JSON.stringify(section, null, 2)}`
+            }
+        ]
+    });
+
+    console.log(`Question Generator Agent Completed for section: ${section.sectionName}`);
+    
+    let content = getFinalMessage(res.messages);
+    
+    console.log(`=== RAW QUESTION GENERATOR RESPONSE [${section.sectionName}] ===`);
+    console.log(content);
+    console.log("=============================================");
+
+    if (typeof content === "string") {
+        content = content.replace(/```json/gi, "").replace(/```/g, "").trim();
+        try {
+            let parsed = JSON.parse(content);
+            if (parsed && !Array.isArray(parsed)) {
+                const keys = Object.keys(parsed);
+                if (keys.length === 1 && Array.isArray(parsed[keys[0]])) {
+                    parsed = parsed[keys[0]];
+                } else if (parsed.questions && Array.isArray(parsed.questions)) {
+                    parsed = parsed.questions;
+                }
+            }
+            return parsed;
+        } catch (e) {
+            console.error("Failed to parse generator JSON:", e);
+            console.log("Returning raw content due to parse failure.");
+            return content;
+        }
+    }
+    return content;
+}
+
+// improve section agent
+export async function improve_section_agent(user_instructions, context_summarized, section, current_questions) {
+    console.log(`Improve Section Agent Started for section: ${section.sectionName}`);
+
+    const improver = createAgent({
+        model: llm_chat,
+        tools: mcp_tools,
+        max_iterations: 3,
+    });
+
+    const res = await improver.invoke({
+        messages: [
+            {
+                role: "user",
+                content: `${improve_section_system_prompt_english}\n\nMOSPI extracted Context: ${context_summarized}\n\nSection Description: ${JSON.stringify(section, null, 2)}\n\nExisting Questions:\n${JSON.stringify(current_questions, null, 2)}\n\nUser Instructions for Improvement:\n${user_instructions}`
+            }
+        ]
+    });
+
+    console.log(`Improve Section Agent Completed for section: ${section.sectionName}`);
+    
+    let content = getFinalMessage(res.messages);
+    
+    console.log(`=== RAW IMPROVE SECTION RESPONSE [${section.sectionName}] ===`);
+    console.log(content);
+    console.log("=========================================================");
+
+    if (typeof content === "string") {
+        content = content.replace(/```json/gi, "").replace(/```/g, "").trim();
+        try {
+            let parsed = JSON.parse(content);
+            if (parsed && !Array.isArray(parsed)) {
+                const keys = Object.keys(parsed);
+                if (keys.length === 1 && Array.isArray(parsed[keys[0]])) {
+                    parsed = parsed[keys[0]];
+                } else if (parsed.questions && Array.isArray(parsed.questions)) {
+                    parsed = parsed.questions;
+                }
+            }
+            return parsed;
+        } catch (e) {
+            console.error("Failed to parse improver JSON:", e);
+            console.log("Returning raw content due to parse failure.");
+            return content;
+        }
+    }
+    return content;
+}
+
+// multilang translator agent
+export async function multilang_translator_agent(existing_questions, target_languages) {
+    console.log(`Multilang Translator Agent Started for languages: ${target_languages.join(", ")}`);
+
+    const translator = createAgent({
+        model: llm_chat,
+        tools: mcp_tools,
+        max_iterations: 3,
+    });
+
+    const res = await translator.invoke({
+        messages: [
+            {
+                role: "user",
+                content: `${multilang_translator_system_prompt}\n\nTarget Languages: ${target_languages.join(", ")}\n\nExisting English Questions:\n${JSON.stringify(existing_questions, null, 2)}`
+            }
+        ]
+    });
+
+    console.log(`Multilang Translator Agent Completed.`);
+    
+    let content = getFinalMessage(res.messages);
+    
+    console.log(`=== RAW MULTILANG TRANSLATOR RESPONSE ===`);
+    console.log(content);
+    console.log("=========================================");
+
+    if (typeof content === "string") {
+        content = content.replace(/```json/gi, "").replace(/```/g, "").trim();
+        try {
+            let parsed = JSON.parse(content);
+            if (parsed && !Array.isArray(parsed)) {
+                const keys = Object.keys(parsed);
+                if (keys.length === 1 && Array.isArray(parsed[keys[0]])) {
+                    parsed = parsed[keys[0]];
+                } else if (parsed.questions && Array.isArray(parsed.questions)) {
+                    parsed = parsed.questions;
+                }
+            }
+            return parsed;
+        } catch (e) {
+            console.error("Failed to parse translator JSON:", e);
+            console.log("Returning raw content due to parse failure.");
+            return content;
+        }
+    }
+    return content;
 }

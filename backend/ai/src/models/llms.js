@@ -4,23 +4,17 @@ import fs from "fs";
 import { ChatOpenAI } from "@langchain/openai"
 import Groq from "groq-sdk";
 import { SarvamAIClient } from "sarvamai";
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 
 // reasoning
 const llm_chat = new ChatOpenAI({
   model: process.env.CHAT_MODEL,
   apiKey: process.env.OPENAI_API_KEY,
-  temprature: 1,
+  temperature: 0.2,
+  maxTokens: 4000,
   configuration: {
     baseURL: process.env.CHAT_MODEL_BASEURL,
   },
 });
-
-const gemini = new ChatGoogleGenerativeAI({
-  model: "gemini-2.5-flash",
-  apiKey: process.env.GEMINI_API_KEY,
-  temprature: 1,
-})
 
 // stt - (groq)
 const stt = async (filename = "audio.m4a") => {
@@ -39,4 +33,4 @@ const sarvam_voice = new SarvamAIClient({
   apiSubscriptionKey: process.env.SARVAM_API_KEY
 });
 
-export { llm_chat, gemini, stt, sarvam_voice }
+export { llm_chat, stt, sarvam_voice }
