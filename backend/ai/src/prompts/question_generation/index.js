@@ -92,7 +92,7 @@ You are a survey question editor. Your job is to REVISE and IMPROVE the question
 - Carefully apply the user's requested changes to the existing questions, or add/remove questions as instructed.
 
 Output Schema:
-${JSON.stringify(englishQuestionArraySchema, null, 2)}
+${JSON.stringify(multiLangQuestionArraySchema, null, 2)}
 `;
 
 const multilang_translator_system_prompt = `
