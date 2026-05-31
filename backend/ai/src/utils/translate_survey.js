@@ -10,6 +10,7 @@ export default async function translate_survey(surveyId, languages) {
             throw new Error(`Survey not found: ${surveyId}`);
         }
 
+        const newLanguages = Array.from(new Set([...languages]));
         const updatedSections = [];
 
         for (const section of survey.questionSections) {
@@ -43,6 +44,18 @@ export default async function translate_survey(surveyId, languages) {
                 translatedQuestions = section.questions; // Fallback
             }
 
+            // Ensure blank audio field for all languages
+            translatedQuestions = translatedQuestions.map(q => {
+                const qObj = q.toObject ? q.toObject() : { ...q };
+                const audio = qObj.audio ? (qObj.audio instanceof Map ? Object.fromEntries(qObj.audio) : { ...qObj.audio }) : {};
+                newLanguages.forEach(lang => {
+                    if (audio[lang] === undefined) {
+                        audio[lang] = " "; // using space to bypass minlength: 1 validation
+                    }
+                });
+                return { ...qObj, audio };
+            });
+
             updatedSections.push({
                 sectionName: section.sectionName,
                 questions: translatedQuestions
@@ -50,9 +63,6 @@ export default async function translate_survey(surveyId, languages) {
         }
 
         console.log(`Saving translated survey to MongoDB...`);
-
-        // Add new languages to supportedLanguages without duplicates
-        const newLanguages = Array.from(new Set([...survey.supportedLanguages, ...languages]));
 
         const updatedSurvey = await Survey.findOneAndUpdate(
             { surveyId },
