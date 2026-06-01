@@ -28,7 +28,7 @@
           }
         },
         {
-          "name": "1. Generate Questions (Init)",
+          "name": "1a. Generate Questions (Vague Query)",
           "request": {
             "method": "POST",
             "header": [
@@ -40,7 +40,41 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\r\n  \"user_query\": \"unemployment rate in rural and urban areas\"\r\n}",
+              "raw": "{\r\n  \"user_query\": \"unemployment\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:3000/question-generation/generate_questions_english",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "question-generation",
+                "generate_questions_english"
+              ]
+            }
+          }
+        },
+        {
+          "name": "1b. Generate Questions (With Answers)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"user_query\": \"unemployment\",\r\n  \"improved_answers\": \"I want to know about youth unemployment in rural areas.\"\r\n}",
               "options": {
                 "raw": {
                   "language": "json"
