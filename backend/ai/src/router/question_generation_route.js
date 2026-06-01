@@ -12,10 +12,25 @@ question_generation_router.get('/', (req, res) => {
 });
 
 question_generation_router.post('/generate_questions_english', async (req, res) => {
-    const { user_query } = req.body;
-    
+    const { user_query, improved_answers } = req.body;
+
     if (!user_query) {
         return res.status(400).json({ error: "user_query is required" });
+    }
+
+    // Only validate if improved_answers has not been provided yet
+    if (improved_answers === undefined) {
+        try {
+            const validation = await prompt_validation_agent(user_query);
+            if (validation && validation.is_vague) {
+                return res.json({
+                    status: "vague",
+                    questions: validation.questions || []
+                });
+            }
+        } catch (e) {
+            console.error("Error during prompt validation (proceeding anyway):", e);
+        }
     }
 
     // Pre-generate a MongoDB surveyId
@@ -38,14 +53,19 @@ question_generation_router.post('/generate_questions_english', async (req, res) 
         return res.status(500).json({ error: "Failed to initialize survey in database" });
     }
 
+    let final_query = user_query;
+    if (improved_answers) {
+        final_query += `\n\nClarification from user: ${improved_answers}`;
+    }
+
     // Fire and forget - do not await
-    generate_english_questions_retry(user_query, surveyId)
+    generate_english_questions_retry(final_query, surveyId)
         .then(() => console.log(`Generation finished for ${surveyId}`))
         .catch(err => console.error(`Generation failed for ${surveyId}:`, err));
 
-    res.json({ 
-        surveyId: surveyId, 
-        status: "processing" 
+    res.json({
+        surveyId: surveyId,
+        status: "processing"
     });
 });
 
@@ -54,11 +74,11 @@ question_generation_router.get('/poll_questions_english/:surveyId', async (req, 
 
     try {
         const survey = await Survey.findOne({ surveyId: surveyId });
-        
+
         if (!survey) {
             return res.status(404).json({ error: "Survey not found." });
         }
-        
+
         // Using "complete" to signal done, or just checking questionSections length
         if (survey.status === "complete" || (survey.questionSections && survey.questionSections.length > 0)) {
             return res.json({ status: "completed", data: survey });
@@ -73,7 +93,7 @@ question_generation_router.get('/poll_questions_english/:surveyId', async (req, 
 
 question_generation_router.post('/improve_section_english', async (req, res) => {
     const { surveyId, sectionName, instructions } = req.body;
-    
+
     if (!surveyId || !sectionName || !instructions) {
         return res.status(400).json({ error: "surveyId, sectionName, and instructions are required" });
     }
@@ -84,23 +104,23 @@ question_generation_router.post('/improve_section_english', async (req, res) => 
         if (!survey) {
             return res.status(404).json({ error: "Survey not found." });
         }
-        
+
         // Optionally mark survey as updating so poll endpoint knows
         await Survey.findOneAndUpdate({ surveyId }, { $set: { status: "updating" } });
 
         // Wait for generation to complete
         const { default: improve_english_section } = await import("../utils/improve_section.js");
-        
+
         await improve_english_section(surveyId, sectionName, instructions);
-        
+
         console.log(`Section ${sectionName} improved for ${surveyId}`);
         // Revert status to complete
         await Survey.findOneAndUpdate({ surveyId }, { $set: { status: "complete" } });
 
-        res.json({ 
-            surveyId: surveyId, 
+        res.json({
+            surveyId: surveyId,
             sectionName: sectionName,
-            status: "completed" 
+            status: "completed"
         });
 
     } catch (e) {
@@ -112,7 +132,7 @@ question_generation_router.post('/improve_section_english', async (req, res) => 
 });
 question_generation_router.post('/generate_questions_multilang', async (req, res) => {
     const { surveyId, languages } = req.body;
-    
+
     if (!surveyId || !languages || !Array.isArray(languages) || languages.length === 0) {
         return res.status(400).json({ error: "surveyId and a non-empty array of languages are required" });
     }
@@ -122,7 +142,7 @@ question_generation_router.post('/generate_questions_multilang', async (req, res
         if (!survey) {
             return res.status(404).json({ error: "Survey not found." });
         }
-        
+
         // Mark survey as translating
         await Survey.findOneAndUpdate({ surveyId }, { $set: { status: "translating" } });
 
@@ -133,9 +153,9 @@ question_generation_router.post('/generate_questions_multilang', async (req, res
             });
         });
 
-        res.json({ 
-            surveyId: surveyId, 
-            status: "processing" 
+        res.json({
+            surveyId: surveyId,
+            status: "processing"
         });
 
     } catch (e) {
@@ -149,11 +169,11 @@ question_generation_router.get('/poll_questions_multilang/:surveyId', async (req
 
     try {
         const survey = await Survey.findOne({ surveyId });
-        
+
         if (!survey) {
             return res.status(404).json({ error: "Survey not found." });
         }
-        
+
         if (survey.status === "complete") {
             return res.json({ status: "completed", data: survey });
         } else {

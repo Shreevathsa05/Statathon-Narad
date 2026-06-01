@@ -26,15 +26,86 @@ export async function generate_english_questions(user_input, surveyId) {
 
     // 4. Generate Questions for each Section Iteratively
     const questionSections = [];
+
+    // add section one as constant here berfore any sections 
+    const demographicsSection = {
+        sectionName: "Demographics",
+        questions: [
+            {
+                qid: "fullname",
+                type: "text",
+                text: { english: "Full Name" },
+                audio: { english: "" }
+            },
+            {
+                qid: "age",
+                type: "text",
+                text: { english: "Age" },
+                audio: { english: "" }
+            },
+            {
+                qid: "gender",
+                type: "mcq",
+                text: { english: "Gender" },
+                audio: { english: "" },
+                options: [
+                    { id: "male", label: { english: "Male" } },
+                    { id: "female", label: { english: "Female" } },
+                    { id: "other", label: { english: "Other" } }
+                ]
+            },
+            {
+                qid: "primarylanguage",
+                type: "text",
+                text: { english: "Primary Language" },
+                audio: { english: "" }
+            },
+            {
+                qid: "uid-type",
+                type: "mcq",
+                text: { english: "UID Type" },
+                audio: { english: "" },
+                options: [
+                    { id: "aadhaar", label: { english: "Aadhaar" } },
+                    { id: "pan", label: { english: "PAN" } },
+                ]
+            },
+            {
+                qid: "uid",
+                type: "text",
+                text: { english: "UID" },
+                audio: { english: "" }
+            },
+            {
+                qid: "pincode",
+                type: "text",
+                text: { english: "Pincode" },
+                audio: { english: "" }
+            },
+            {
+                qid: "area",
+                type: "text",
+                text: { english: "Area" },
+                audio: { english: "" }
+            }
+        ]
+    };
+    
+    questionSections.push(demographicsSection);
+    
+    let allGeneratedQuestions = [...demographicsSection.questions];
+
     for (const section of sectionsPlan) {
         console.log(`Generating questions for section: ${section.sectionName}`);
-        let questionsForSection = await question_generator_agent(user_input, context, section);
+        let questionsForSection = await question_generator_agent(user_input, context, section, allGeneratedQuestions);
 
         // Safety check if response is not array
         if (!Array.isArray(questionsForSection)) {
             console.log("Warning: generator did not return array, defaulting to empty");
             questionsForSection = [];
         }
+
+        allGeneratedQuestions = allGeneratedQuestions.concat(questionsForSection);
 
         questionSections.push({
             sectionName: section.sectionName || "General",
