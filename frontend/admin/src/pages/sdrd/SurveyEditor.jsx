@@ -1,0 +1,529 @@
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { surveyClient } from '../../api/survey';
+import { aiClient } from '../../api/aiClient';
+import { ArrowLeft, Sparkles, CheckCircle2, AlertCircle, Save, X, Loader2, Globe, Check, Edit2 } from 'lucide-react';
+
+export default function SurveyEditor({ surveyId: propSurveyId }) {
+  const { surveyId: paramSurveyId } = useParams();
+  const surveyId = propSurveyId || paramSurveyId;
+  const navigate = useNavigate();
+
+  const [survey, setSurvey] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [approving, setApproving] = useState(false);
+
+  // Editable local state
+  const [localSections, setLocalSections] = useState([]);
+  const [hasChanges, setHasChanges] = useState(false);
+  const [editingSections, setEditingSections] = useState({}); // Track edit mode per section
+
+  // AI Improve state
+  const [activeImproveSection, setActiveImproveSection] = useState(null); // name of section
+  const [improveInstructions, setImproveInstructions] = useState('');
+  const [improvingStatus, setImprovingStatus] = useState('idle');
+
+  // Multi-lang state
+  const [showLangPanel, setShowLangPanel] = useState(false);
+  const [selectedLangs, setSelectedLangs] = useState([]);
+  const [translateStatus, setTranslateStatus] = useState('idle');
+  const [viewLang, setViewLang] = useState('english');
+
+  // Approval modal state
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  
+  // Generic error modal state
+  const [showErrorModal, setShowErrorModal] = useState(null);
+
+  const AVAILABLE_LANGUAGES = [
+    "hindi", "bengali", "telugu", "tamil", "marathi", "gujarati", 
+    "kannada", "malayalam", "odia", "punjabi", "urdu"
+  ];
+
+  useEffect(() => {
+    fetchSurvey();
+  }, [surveyId]);
+
+  const fetchSurvey = async (showLoading = true) => {
+    try {
+      if (showLoading) setLoading(true);
+      const res = await surveyClient.getSurveyById(surveyId);
+      const surveyData = res.data.data;
+      setSurvey(surveyData);
+      setLocalSections(surveyData.questionSections || []);
+      // Reset selected langs when fetching fresh survey
+      setSelectedLangs([]);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load survey.');
+    } finally {
+      if (showLoading) setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let interval;
+    if (translateStatus === 'processing') {
+      interval = setInterval(async () => {
+        try {
+          const res = await aiClient.pollQuestionsMultilang(surveyId);
+          if (res.status === 'completed') {
+            clearInterval(interval);
+            setTranslateStatus('idle');
+            setShowLangPanel(false);
+            await fetchSurvey();
+          }
+        } catch (err) {
+          console.error("Polling error", err);
+        }
+      }, 5000);
+    }
+    return () => clearInterval(interval);
+  }, [translateStatus, surveyId]);
+
+  const handleApprove = async () => {
+    setShowApproveModal(false);
+    try {
+      setApproving(true);
+      await surveyClient.approveSurvey(surveyId);
+      navigate('/sdrd');
+    } catch (err) {
+      setShowErrorModal("Failed to approve survey.");
+    } finally {
+      setApproving(false);
+    }
+  };
+
+  const handleManualSave = async () => {
+    try {
+      setSaving(true);
+      await surveyClient.updateSurvey(surveyId, { questionSections: localSections });
+      setSurvey(prev => ({ ...prev, questionSections: localSections }));
+      setHasChanges(false);
+    } catch (err) {
+      setShowErrorModal("Failed to save changes.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleImproveSectionSubmit = async (e, sectionName) => {
+    e.preventDefault();
+    if (!improveInstructions.trim()) return;
+
+    setImprovingStatus('processing');
+    try {
+      const res = await aiClient.improveSectionEnglish(surveyId, sectionName, improveInstructions);
+      if (res.status === 'completed') {
+        await fetchSurvey(false);
+        setActiveImproveSection(null);
+        setImproveInstructions('');
+      }
+    } catch (err) {
+      setShowErrorModal("AI Improvement failed: " + err.message);
+    } finally {
+      setImprovingStatus('idle');
+    }
+  };
+
+  const handleTranslateSubmit = async () => {
+    if (selectedLangs.length === 0) {
+      setShowErrorModal("Please select at least one regional language before translating.");
+      return;
+    }
+    setTranslateStatus('processing');
+    try {
+      await aiClient.generateQuestionsMultilang(surveyId, selectedLangs);
+    } catch (err) {
+      setShowErrorModal("Translation initiation failed: " + err.message);
+      setTranslateStatus('idle');
+    }
+  };
+
+  const toggleLanguage = (lang) => {
+    if (selectedLangs.includes(lang)) {
+      setSelectedLangs(selectedLangs.filter(l => l !== lang));
+    } else {
+      setSelectedLangs([...selectedLangs, lang]);
+    }
+  };
+
+  const updateQuestionText = (sectionIndex, qIndex, newText) => {
+    const updated = [...localSections];
+    if (!updated[sectionIndex].questions[qIndex].text) {
+      updated[sectionIndex].questions[qIndex].text = {};
+    }
+    updated[sectionIndex].questions[qIndex].text.english = newText;
+    setLocalSections(updated);
+    setHasChanges(true);
+  };
+
+  const updateOptionText = (sectionIndex, qIndex, optIndex, newLabel) => {
+    const updated = [...localSections];
+    if (!updated[sectionIndex].questions[qIndex].options[optIndex].label) {
+      updated[sectionIndex].questions[qIndex].options[optIndex].label = {};
+    }
+    updated[sectionIndex].questions[qIndex].options[optIndex].label.english = newLabel;
+    setLocalSections(updated);
+    setHasChanges(true);
+  };
+
+  if (loading) return (
+    <div className="flex flex-col flex-1 min-w-0 bg-bg px-6 py-6 max-w-[1200px] mx-auto w-full animate-pulse">
+      {/* Header Skeleton */}
+      <div className="pb-6 mb-6 border-b border-border flex justify-between">
+        <div className="flex flex-col gap-3 w-full max-w-[400px]">
+          <div className="h-4 bg-border/40 rounded w-24"></div>
+          <div className="h-8 bg-border/40 rounded w-full mt-2"></div>
+          <div className="h-4 bg-border/20 rounded w-48 mt-1"></div>
+        </div>
+        <div className="flex gap-3 pt-7 hidden md:flex">
+          <div className="h-9 bg-border/40 rounded w-28"></div>
+          <div className="h-9 bg-border/40 rounded w-32"></div>
+        </div>
+      </div>
+      {/* Sections Skeleton */}
+      <div className="flex flex-col gap-8">
+        {[1, 2].map(i => (
+          <div key={i} className="bg-bg border border-border rounded-md shadow-sm h-64 flex flex-col">
+             <div className="h-14 bg-surface border-b border-border rounded-t-md flex items-center px-6">
+               <div className="h-5 bg-border/40 rounded w-48"></div>
+             </div>
+             <div className="flex-1 p-6 flex flex-col gap-5">
+                <div className="flex items-center gap-2">
+                  <div className="h-4 w-6 bg-border/40 rounded"></div>
+                  <div className="h-4 w-12 bg-border/40 rounded-full"></div>
+                </div>
+                <div className="h-4 bg-border/40 rounded w-3/4 ml-8"></div>
+                <div className="flex flex-col gap-2 ml-8 mt-1">
+                  <div className="h-3.5 bg-border/20 rounded w-1/3"></div>
+                  <div className="h-3.5 bg-border/20 rounded w-1/4"></div>
+                </div>
+             </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+  if (error) return <div className="text-error" style={{ padding: 'var(--sp-8)' }}>{error}</div>;
+  if (!survey) return null;
+
+  const isPending = survey.status === 'pending';
+  const hasTranslations = survey.supportedLanguages && survey.supportedLanguages.length > 1;
+  const isTranslationLocked = translateStatus === 'processing' || hasTranslations;
+
+  return (
+    <div className="flex flex-col flex-1 min-w-0 bg-bg">
+      <div className="flex flex-col flex-1 w-full max-w-[1200px] mx-auto px-6 pb-16">
+      
+      {/* Header */}
+      <div className="flex flex-col lg:flex-row lg:items-start justify-between py-6 mb-6 border-b border-border bg-bg sticky top-0 z-10 gap-6">
+        <div className="flex-1 min-w-0">
+          <button 
+            className="inline-flex items-center gap-2 text-sm font-medium text-text-muted hover:text-text-primary mb-2 transition-colors"
+            onClick={() => navigate('/sdrd')}
+          >
+            <ArrowLeft size={16} /> Back to Dashboard
+          </button>
+          <h1 className="text-2xl font-bold tracking-tight text-text-primary mb-2 break-words">{survey.name}</h1>
+          <div className="flex items-center gap-4 mt-2">
+            <span className="text-xs text-text-muted font-mono shrink-0">ID: {survey.surveyId}</span>
+            <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-medium rounded-full border uppercase tracking-wider shrink-0 ${
+                  survey.status === 'active' ? 'bg-geist-blue/10 text-geist-blue border-geist-blue/20' : 
+                  survey.status === 'pending' ? 'bg-amber-500/10 text-amber-700 border-amber-500/20' : 
+                  'bg-geist-error/10 text-geist-error border-geist-error/20'
+                }`}>{survey.status}</span>
+          </div>
+        </div>
+
+        {isPending && (
+          <div className="flex items-center gap-3 shrink-0 lg:pt-7">
+            {hasChanges && (
+              <button className="inline-flex items-center justify-center gap-2 px-4 h-9 text-sm font-medium rounded-md bg-white border border-border text-text-primary hover:bg-surface-alt transition-colors disabled:opacity-50 shrink-0 whitespace-nowrap" onClick={handleManualSave} disabled={saving || translateStatus === 'processing'}>
+                {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                Save Draft
+              </button>
+            )}
+            <button className="inline-flex items-center justify-center gap-2 px-4 h-9 text-sm font-medium rounded-md bg-white border border-border text-text-primary hover:bg-surface-alt transition-colors disabled:opacity-50 shrink-0 whitespace-nowrap" onClick={() => setShowLangPanel(!showLangPanel)} disabled={translateStatus === 'processing'}>
+              <Globe size={16} /> Translate
+            </button>
+            <button className="inline-flex items-center justify-center gap-2 px-4 h-9 text-sm font-medium rounded-md bg-black text-white hover:bg-neutral-800 transition-colors disabled:opacity-50 shrink-0 whitespace-nowrap" onClick={() => setShowApproveModal(true)} disabled={approving || translateStatus === 'processing'}>
+              {approving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+              Approve Survey
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Translation Panel */}
+      {showLangPanel && (
+        <div className="bg-surface-alt border border-border rounded-md p-6 mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold tracking-tight m-0">Translate Survey</h3>
+            <button className="inline-flex items-center justify-center w-8 h-8 rounded text-text-muted hover:bg-black/5 hover:text-text-primary transition-colors" onClick={() => setShowLangPanel(false)}>
+              <X size={16} />
+            </button>
+          </div>
+          
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-text-primary mb-2">Select Regional Languages</label>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {AVAILABLE_LANGUAGES.map(lang => {
+                const isExisting = survey?.supportedLanguages?.includes(lang);
+                return (
+                  <button
+                    type="button"
+                    key={lang}
+                    onClick={() => !isExisting && toggleLanguage(lang)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full border transition-colors capitalize ${selectedLangs.includes(lang) ? 'bg-black text-white border-black' : 'bg-white text-text-primary border-border hover:border-black'} ${isExisting ? 'opacity-50 cursor-not-allowed bg-surface border-border hover:border-border text-text-muted' : 'cursor-pointer'}`}
+                    disabled={isExisting}
+                    title={isExisting ? "Already translated" : ""}
+                  >
+                    {selectedLangs.includes(lang) && <Check size={14} />}
+                    {lang}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3">
+            <button className="inline-flex items-center justify-center gap-2 px-4 h-9 text-sm font-medium rounded-md bg-black text-white hover:bg-neutral-800 transition-colors disabled:opacity-50" onClick={handleTranslateSubmit} disabled={translateStatus === 'processing'}>
+              {translateStatus === 'processing' ? (
+                <><Loader2 size={16} className="animate-spin" /> Translating... this may take a minute</>
+              ) : (
+                <><Globe size={16} /> Start Translation</>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Language Selector */}
+      {survey?.supportedLanguages && survey.supportedLanguages.length > 1 && (
+        <div className="flex items-center gap-4 mb-6 p-4 bg-surface border border-border rounded-md">
+          <span className="text-sm font-medium text-text-muted">Viewing Language:</span>
+          <select 
+            className="w-auto h-9 px-3 bg-white border border-border rounded-md text-sm text-text-primary focus:outline-none focus:border-geist-blue transition-colors capitalize" 
+            value={viewLang}
+            onChange={(e) => setViewLang(e.target.value)}
+          >
+            <option value="english">English</option>
+            {survey.supportedLanguages.filter(l => l !== 'english').map(l => (
+              <option key={l} value={l}>{l}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Sections List */}
+      <div className="flex flex-col gap-8">
+        {localSections.map((sec, secIdx) => (
+          <div key={secIdx} className="bg-bg border border-border rounded-md overflow-hidden shadow-sm">
+            
+            {/* Section Header */}
+            <div className="flex justify-between items-center bg-surface border-b border-border px-6 py-4">
+              {isPending && editingSections[secIdx] ? (
+                <input 
+                  type="text" 
+                  value={sec.sectionName}
+                  onChange={(e) => {
+                    const updated = [...localSections];
+                    updated[secIdx].sectionName = e.target.value;
+                    setLocalSections(updated);
+                    setHasChanges(true);
+                  }}
+                  className="w-full max-w-[400px] text-lg font-semibold tracking-tight m-0 bg-transparent border-b border-dashed border-border focus:border-geist-blue outline-none py-0.5"
+                  placeholder="Section Name"
+                />
+              ) : (
+                <h2 className="text-lg font-semibold tracking-tight m-0">{sec.sectionName}</h2>
+              )}
+              
+              {isPending && (
+                <div className="flex gap-2">
+                  {sec.sectionName?.toLowerCase() !== 'demographics' && (
+                    <button
+                      className="inline-flex items-center gap-1.5 px-2.5 h-7 text-xs font-medium rounded text-geist-blue bg-geist-blue/10 border border-geist-blue/20 hover:bg-geist-blue/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={() => setActiveImproveSection(sec.sectionName)}
+                      disabled={isTranslationLocked}
+                    >
+                      <Sparkles size={14} /> AI Improve
+                    </button>
+                  )}
+                  
+                  {editingSections[secIdx] ? (
+                    <button
+                      className="inline-flex items-center gap-1.5 px-2.5 h-7 text-xs font-medium rounded bg-black text-white hover:bg-neutral-800 transition-colors"
+                      onClick={() => setEditingSections(prev => ({ ...prev, [secIdx]: false }))}
+                    >
+                      <Save size={14} /> Save
+                    </button>
+                  ) : (
+                    <button
+                      className="inline-flex items-center gap-1.5 px-2.5 h-7 text-xs font-medium rounded bg-white border border-border text-text-primary hover:bg-surface-alt transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={() => setEditingSections(prev => ({ ...prev, [secIdx]: true }))}
+                      disabled={isTranslationLocked}
+                    >
+                      <Edit2 size={14} /> Edit
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* AI Improve Inline Panel */}
+            {activeImproveSection === sec.sectionName && (
+              <div className="px-6 py-4 bg-bg border-b border-border">
+                <form onSubmit={(e) => handleImproveSectionSubmit(e, sec.sectionName)} className="flex items-center gap-3">
+                  <input 
+                    className="flex-1 h-9 px-3 bg-white border border-border rounded-md text-sm text-text-primary focus:outline-none focus:border-geist-blue transition-colors"
+                    type="text" 
+                    value={improveInstructions}
+                    onChange={e => setImproveInstructions(e.target.value)}
+                    placeholder="e.g. Add a question about household income, make options simpler..."
+                    autoFocus
+                  />
+                  <button type="submit" disabled={improvingStatus === 'processing' || !improveInstructions.trim()} className="inline-flex items-center justify-center gap-2 px-4 h-9 text-sm font-medium rounded-md bg-black text-white hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                    {improvingStatus === 'processing' ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} 
+                    Regenerate
+                  </button>
+                  <button type="button" className="inline-flex items-center justify-center w-9 h-9 rounded text-text-muted hover:bg-surface hover:text-text-primary transition-colors" onClick={() => setActiveImproveSection(null)}>
+                    <X size={20} />
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* Questions */}
+            {improvingStatus === 'processing' && activeImproveSection === sec.sectionName ? (
+              <div className="px-6 py-8 flex flex-col gap-8 animate-pulse">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="flex flex-col gap-3">
+                    <div className="flex gap-2 items-center">
+                      <div className="w-6 h-4 bg-border/40 rounded"></div>
+                      <div className="w-12 h-4 bg-border/40 rounded-full"></div>
+                    </div>
+                    <div className="w-3/4 h-4 bg-border/40 rounded ml-8 mt-1"></div>
+                    <div className="flex flex-col gap-2.5 ml-8 mt-3">
+                      <div className="w-1/2 h-3.5 bg-border/20 rounded"></div>
+                      <div className="w-2/3 h-3.5 bg-border/20 rounded"></div>
+                      <div className="w-1/3 h-3.5 bg-border/20 rounded"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="px-6 py-2">
+                {sec.questions.map((q, qIdx) => (
+                <div key={q.qid} className={`py-4 ${qIdx === sec.questions.length - 1 ? '' : 'border-b border-border/50'}`}>
+                  
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-text-muted text-xs font-bold w-8">Q{qIdx+1}.</span>
+                    <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-medium rounded-full border border-border bg-surface text-text-muted uppercase tracking-wider">
+                      {q.type}
+                    </span>
+                    {q.showIf && (
+                      <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-medium rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-700 uppercase tracking-wider">
+                        Logic: if {q.showIf.questionId} == {q.showIf.equals}
+                      </span>
+                    )}
+                  </div>
+                  
+                  {isPending && editingSections[secIdx] ? (
+                    <input 
+                      type="text"
+                      value={q.text?.english || ''}
+                      onChange={(e) => updateQuestionText(secIdx, qIdx, e.target.value)}
+                      className="w-full bg-transparent border border-dashed border-transparent focus:border-border hover:border-border text-text-primary text-base font-medium p-1 ml-9 outline-none transition-colors rounded-sm"
+                    />
+                  ) : (
+                    <div className="ml-10 text-base font-medium text-text-primary py-1">
+                      {q.text?.[viewLang] || q.text?.english}
+                    </div>
+                  )}
+
+                  {/* Options */}
+                  {(q.type === 'mcq' || q.type === 'checkbox') && q.options && (
+                    <div className="flex flex-col gap-2 ml-10 mt-3">
+                      {q.options.map((opt, optIdx) => (
+                        <div key={opt.id} className="flex items-center gap-2">
+                          <div className={`w-4 h-4 border border-border shrink-0 ${q.type === 'mcq' ? 'rounded-full' : 'rounded-sm'}`} />
+                          {isPending && editingSections[secIdx] ? (
+                            <input 
+                              type="text"
+                              value={opt.label?.english || ''}
+                              onChange={(e) => updateOptionText(secIdx, qIdx, optIdx, e.target.value)}
+                              className="flex-1 bg-transparent border border-dashed border-transparent focus:border-border hover:border-border text-text-muted text-sm px-1 py-0.5 outline-none transition-colors rounded-sm"
+                            />
+                          ) : (
+                            <span className="text-text-muted text-sm">{opt.label?.[viewLang] || opt.label?.english}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            )}
+
+          </div>
+        ))}
+
+        {localSections.length === 0 && (
+          <div className="flex flex-col items-center justify-center p-12 text-center bg-surface border border-dashed border-border rounded-md text-text-muted">
+            No sections found in this survey.
+          </div>
+        )}
+      </div>
+      </div>
+
+      {/* Approve Survey Modal */}
+      {showApproveModal && (
+        <div className="fixed inset-0 w-screen h-screen bg-black/40 backdrop-blur-sm flex items-center justify-center z-[1000]" onClick={() => setShowApproveModal(false)}>
+          <div className="bg-bg border border-border rounded-md shadow-lg w-full max-w-[480px] flex flex-col animate-[modalIn_0.2s_ease-out]" onClick={e => e.stopPropagation()}>
+            <div className="p-5 border-b border-border flex items-center justify-between">
+              <h2 className="text-lg font-semibold m-0 text-text-primary">Approve Survey</h2>
+              <button className="inline-flex items-center justify-center w-8 h-8 rounded text-text-muted hover:bg-surface hover:text-text-primary transition-colors" onClick={() => setShowApproveModal(false)}><X size={16} /></button>
+            </div>
+            <div className="p-5 max-h-[70vh] overflow-y-auto">
+              <p className="m-0 text-sm text-text-secondary">
+                Are you sure you want to approve this survey? It will become active and locked for SDRD edits.
+              </p>
+            </div>
+            <div className="px-5 py-3 border-t border-border bg-surface-alt rounded-b-md flex items-center justify-end gap-3">
+              <button className="inline-flex items-center justify-center px-4 h-9 text-sm font-medium rounded-md bg-white border border-border text-text-primary hover:bg-surface transition-colors" onClick={() => setShowApproveModal(false)}>Cancel</button>
+              <button className="inline-flex items-center justify-center px-4 h-9 text-sm font-medium rounded-md bg-black text-white hover:bg-neutral-800 transition-colors" onClick={handleApprove}>Approve</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error Modal */}
+      {showErrorModal && (
+        <div className="fixed inset-0 w-screen h-screen bg-black/40 backdrop-blur-sm flex items-center justify-center z-[1000]" onClick={() => setShowErrorModal(null)}>
+          <div className="bg-bg border border-border rounded-md shadow-lg w-full max-w-[400px] flex flex-col animate-[modalIn_0.2s_ease-out]" onClick={e => e.stopPropagation()}>
+            <div className="p-5 border-b border-border flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-geist-error/10 flex items-center justify-center text-geist-error shrink-0">
+                <AlertCircle size={18} />
+              </div>
+              <h2 className="text-lg font-semibold m-0 text-text-primary">Error</h2>
+            </div>
+            <div className="p-5">
+              <p className="m-0 text-sm text-text-secondary">
+                {showErrorModal}
+              </p>
+            </div>
+            <div className="px-5 py-3 border-t border-border bg-surface-alt rounded-b-md flex items-center justify-end">
+              <button className="inline-flex items-center justify-center px-4 h-9 text-sm font-medium rounded-md bg-black text-white hover:bg-neutral-800 transition-colors" onClick={() => setShowErrorModal(null)}>OK</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}

@@ -1,1 +1,1 @@
-export const DB_NAME = "narad_ai";
+export const DB_NAME = "statathon";

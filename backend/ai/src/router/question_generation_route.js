@@ -3,6 +3,10 @@ import { Router } from "express";
 import crypto from "crypto";
 import { Survey } from "../mongodb/surveySchema.js";
 import generate_english_questions_retry from "../utils/generate_questions.js";
+import { prompt_validation_agent } from "../models/agents.js";
+
+// In-memory store for real-time generation logs
+export const surveyLogs = new Map();
 
 const question_generation_router = Router();
 
@@ -79,11 +83,13 @@ question_generation_router.get('/poll_questions_english/:surveyId', async (req, 
             return res.status(404).json({ error: "Survey not found." });
         }
 
-        // Using "complete" to signal done, or just checking questionSections length
-        if (survey.status === "complete" || (survey.questionSections && survey.questionSections.length > 0)) {
+        // Wait for questionSections to be populated by the background task
+        if (survey.questionSections && survey.questionSections.length > 0) {
+            surveyLogs.delete(surveyId); // cleanup
             return res.json({ status: "completed", data: survey });
         } else {
-            return res.json({ status: "processing" });
+            const logs = surveyLogs.get(surveyId) || [];
+            return res.json({ status: "processing", logs: logs });
         }
     } catch (err) {
         console.error("Error polling survey:", err);
@@ -114,8 +120,8 @@ question_generation_router.post('/improve_section_english', async (req, res) => 
         await improve_english_section(surveyId, sectionName, instructions);
 
         console.log(`Section ${sectionName} improved for ${surveyId}`);
-        // Revert status to complete
-        await Survey.findOneAndUpdate({ surveyId }, { $set: { status: "complete" } });
+        // Revert status to pending
+        await Survey.findOneAndUpdate({ surveyId }, { $set: { status: "pending" } });
 
         res.json({
             surveyId: surveyId,
@@ -125,8 +131,8 @@ question_generation_router.post('/improve_section_english', async (req, res) => 
 
     } catch (e) {
         console.error("Error initiating section improvement:", e);
-        // Revert status to complete in case of error so it's not stuck
-        Survey.findOneAndUpdate({ surveyId }, { $set: { status: "complete" } }).exec();
+        // Revert status to pending in case of error so it's not stuck
+        Survey.findOneAndUpdate({ surveyId }, { $set: { status: "pending" } }).exec();
         return res.status(500).json({ error: "Internal Server Error" });
     }
 });
@@ -174,7 +180,7 @@ question_generation_router.get('/poll_questions_multilang/:surveyId', async (req
             return res.status(404).json({ error: "Survey not found." });
         }
 
-        if (survey.status === "complete") {
+        if (survey.status === "pending") {
             return res.json({ status: "completed", data: survey });
         } else {
             return res.json({ status: "processing" });
