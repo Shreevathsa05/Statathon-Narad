@@ -7,7 +7,8 @@ import {
     section_planner_system_prompt, 
     question_generator_system_prompt,
     improve_section_system_prompt_english,
-    multilang_translator_system_prompt
+    multilang_translator_system_prompt,
+    prompt_validation_system_prompt
 } from "../prompts/question_generation/index.js";
 
 // context collector agent
@@ -87,7 +88,7 @@ export async function section_planner_agent(user_input, context_extracted) {
 }
 
 // question generator agent
-export async function question_generator_agent(user_input, context_summarized, section) {
+export async function question_generator_agent(user_input, context_summarized, section, previous_questions = []) {
     console.log(`Question Generator Agent Started for section: ${section.sectionName}`);
 
     const generator = createAgent({
@@ -100,7 +101,7 @@ export async function question_generator_agent(user_input, context_summarized, s
         messages: [
             {
                 role: "user",
-                content: `${question_generator_system_prompt}\n\nTopic: ${user_input}\nMOSPI extracted Context: ${context_summarized}\n\nSection to Generate: ${JSON.stringify(section, null, 2)}`
+                content: `${question_generator_system_prompt}\n\nTopic: ${user_input}\nMOSPI extracted Context: ${context_summarized}\n\nSection to Generate: ${JSON.stringify(section, null, 2)}\n\nPreviously Generated Questions (DO NOT REPEAT THESE):\n${JSON.stringify(previous_questions, null, 2)}`
             }
         ]
     });
@@ -228,6 +229,45 @@ export async function multilang_translator_agent(existing_questions, target_lang
             console.error("Failed to parse translator JSON:", e);
             console.log("Returning raw content due to parse failure.");
             return content;
+        }
+    }
+    return content;
+}
+
+// prompt validation agent
+export async function prompt_validation_agent(user_input) {
+    console.log("Prompt Validation Agent Started");
+
+    const validator = createAgent({
+        model: llm_chat,
+        tools: [],
+        max_iterations: 3,
+    });
+
+    const res = await validator.invoke({
+        messages: [
+            {
+                role: "user",
+                content: `${prompt_validation_system_prompt}\n\nUser Input: ${user_input}`
+            }
+        ]
+    });
+
+    console.log(`Prompt Validation Agent Completed.`);
+    
+    let content = getFinalMessage(res.messages);
+    
+    console.log(`=== RAW PROMPT VALIDATOR RESPONSE ===`);
+    console.log(content);
+    console.log("=========================================");
+
+    if (typeof content === "string") {
+        content = content.replace(/```json/gi, "").replace(/```/g, "").trim();
+        try {
+            return JSON.parse(content);
+        } catch (e) {
+            console.error("Failed to parse validator JSON:", e);
+            return { is_vague: false, questions: [] };
         }
     }
     return content;

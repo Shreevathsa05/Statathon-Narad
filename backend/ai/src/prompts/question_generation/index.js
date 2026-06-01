@@ -43,6 +43,7 @@ Provide a structured summary of the gathered MoSPI context. Include:
 User wants context to build:`;
 
 const section_planner_system_prompt = `You are a strict JSON outputting agent. Your task is to plan the logical sections of a survey based on the user's input and context.
+Keep in mind that this survey is for directly asking citizens about their personal data, NOT asking government officials for aggregate data. Plan sections accordingly.
 You MUST output ONLY a valid JSON array. DO NOT use markdown, do NOT use backticks, do NOT add explanations.
 Format Example:
 [
@@ -63,6 +64,8 @@ You are a survey question generator. Your sole job is to generate questions for 
 - Do not add extra characters allowed outside json.
 - showIf.questionId must reference an existing qid.
 - Generate questions specifically tailored to the requested section description.
+- CRITICAL: Questions MUST be addressed directly to the citizen/respondent (e.g., "What is your income?", not "What is the average income in the area?").
+- Do NOT ask for estimates, aggregate data, or statistics. Ask for the citizen's own personal data.
 
 Output Schema:
 ${JSON.stringify(englishQuestionArraySchema, null, 2)}
@@ -75,6 +78,8 @@ You are a survey question generator. Your sole job is to generate questions for 
 - Do not add extra characters allowed outside json.
 - showIf.questionId must reference an existing qid.
 - Generate questions specifically tailored to the requested section description.
+- CRITICAL: Questions MUST be addressed directly to the citizen/respondent (e.g., "What is your income?", not "What is the average income in the area?").
+- Do NOT ask for estimates, aggregate data, or statistics. Ask for the citizen's own personal data.
 
 Output Schema:
 ${JSON.stringify(multiLangQuestionArraySchema, null, 2)}
@@ -90,6 +95,7 @@ You are a survey question editor. Your job is to REVISE and IMPROVE the question
 - Do not add extra characters allowed outside json.
 - showIf.questionId must reference an existing qid within the array.
 - Carefully apply the user's requested changes to the existing questions, or add/remove questions as instructed.
+- CRITICAL: Questions MUST be addressed directly to the citizen/respondent asking about their personal situation. Do NOT ask for estimates, aggregate data, or statistics.
 
 Output Schema:
 ${JSON.stringify(multiLangQuestionArraySchema, null, 2)}
@@ -109,12 +115,27 @@ Output Schema:
 ${JSON.stringify(multiLangQuestionArraySchema, null, 2)}
 `;
 
-export { 
-    context_collector_system_prompt, 
-    section_planner_system_prompt, 
-    question_generator_system_prompt, 
-    question_generator_system_prompt_english, 
-    question_generator_system_prompt_multilang,
-    improve_section_system_prompt_english,
-    multilang_translator_system_prompt
+const prompt_validation_system_prompt = `
+You are an AI assistant that validates user prompts for survey generation.
+Your task is to determine if the user's prompt is too vague or broad to generate a specific, actionable survey.
+If the prompt is vague, you must ask clarifying questions to the user to get more details.
+If the prompt is clear and specific enough, you indicate that it is valid.
+
+Output your response strictly in the following JSON format:
+{
+  "is_vague": true,
+  "questions": ["Question 1", "Question 2", "Question 3"] // Empty array if is_vague is false
+}
+Do not include any extra character or markdown formatting outside the JSON object.
+`;
+
+export {
+   context_collector_system_prompt,
+   section_planner_system_prompt,
+   question_generator_system_prompt,
+   question_generator_system_prompt_english,
+   question_generator_system_prompt_multilang,
+   improve_section_system_prompt_english,
+   multilang_translator_system_prompt,
+   prompt_validation_system_prompt
 };
