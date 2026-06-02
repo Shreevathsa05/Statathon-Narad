@@ -20,9 +20,9 @@ export const submitSurveyResponse = asyncHandler(async (req, res) => {
         throw new ApiError(403, "Survey is not accepting responses");
     }
 
-    const { responses, userInfo, paraInfo } = req.body;
+    const { response, userInfo, paraInfo } = req.body;
 
-    if (!Array.isArray(responses) || responses.length === 0) {
+    if (!Array.isArray(response) || response.length === 0) {
         throw new ApiError(400, "Response must be a non-empty array");
     }
 
@@ -32,7 +32,7 @@ export const submitSurveyResponse = asyncHandler(async (req, res) => {
         allQuestions.map(q => [q.qid, q])
     );
 
-    for (const ans of responses) {
+    for (const ans of response) {
         const question = questionMap.get(ans.qid);
 
         if (!question) {
@@ -96,7 +96,7 @@ export const submitSurveyResponse = asyncHandler(async (req, res) => {
         surveyId: survey._id,
         userInfo,
         paraInfo,
-        responses
+        response
     });
 
     return res.status(201).json(
