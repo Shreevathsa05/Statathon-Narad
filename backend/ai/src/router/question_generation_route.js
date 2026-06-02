@@ -181,9 +181,11 @@ question_generation_router.get('/poll_questions_multilang/:surveyId', async (req
         }
 
         if (survey.status === "pending") {
+            surveyLogs.delete(surveyId);
             return res.json({ status: "completed", data: survey });
         } else {
-            return res.json({ status: "processing" });
+            const logs = surveyLogs.get(surveyId) || [];
+            return res.json({ status: "processing", logs: logs });
         }
     } catch (err) {
         console.error("Error polling multilang survey:", err);

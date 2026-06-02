@@ -194,8 +194,8 @@ export async function improve_section_agent(user_instructions, context_summarize
 }
 
 // multilang translator agent
-export async function multilang_translator_agent(existing_questions, target_languages) {
-    console.log(`Multilang Translator Agent Started for languages: ${target_languages.join(", ")}`);
+export async function multilang_translator_agent(existing_questions, target_languages, surveyId) {
+    pushLog(surveyId, `Multilang Translator Agent Started for languages: ${target_languages.join(", ")}`);
 
     const translator = createAgent({
         model: llm_chat,
@@ -212,13 +212,13 @@ export async function multilang_translator_agent(existing_questions, target_lang
         ]
     }, { recursionLimit: 100 });
 
-    console.log(`Multilang Translator Agent Completed.`);
+    pushLog(surveyId, `Multilang Translator Agent Completed.`);
     
     let content = getFinalMessage(res.messages);
     
-    console.log(`=== RAW MULTILANG TRANSLATOR RESPONSE ===`);
-    console.log(content);
-    console.log("=========================================");
+    pushLog(surveyId, `=== RAW MULTILANG TRANSLATOR RESPONSE ===`);
+    pushLog(surveyId, content);
+    pushLog(surveyId, "=========================================");
 
     if (typeof content === "string") {
         content = content.replace(/```json/gi, "").replace(/```/g, "").trim();

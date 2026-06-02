@@ -226,9 +226,13 @@ export default function AIPromptBuilder() {
                             <span className="text-[11px] text-text-muted animate-pulse block mb-2">This process involves multiple AI subagents and can take 60-90 seconds...</span>
                             {agentLogs.length > 0 && (
                               <div ref={logContainerRef} className="w-full bg-white border border-border/60 rounded-md p-3 max-h-28 overflow-y-auto text-[11px] font-mono text-text-muted flex flex-col gap-1 shadow-inner scrollbar-thin">
-                                {agentLogs.map((log, i) => (
-                                  <div key={i} className="whitespace-pre-wrap">{log}</div>
-                                ))}
+                                {agentLogs.map((log, i) => {
+                                  const dist = agentLogs.length - 1 - i;
+                                  const opacity = Math.max(0.3, 1 - dist * 0.25);
+                                  return (
+                                    <div key={i} className="whitespace-pre-wrap transition-opacity duration-500" style={{ opacity }}>{log}</div>
+                                  );
+                                })}
                               </div>
                             )}
                           </div>
@@ -316,34 +320,37 @@ export default function AIPromptBuilder() {
               Go to Editor <ArrowRight size={18} />
             </button>
           ) : (
-            <form onSubmit={handleSubmit} className="relative flex flex-col bg-surface-alt rounded-2xl border border-border transition-all focus-within:border-geist-blue focus-within:ring-[3px] focus-within:ring-geist-blue/10 shadow-sm">
-            <textarea
-              className="w-full bg-transparent border-none outline-none text-[15px] text-text-primary resize-none min-h-[60px] max-h-[200px] py-4 pl-5 pr-14 overflow-y-auto leading-relaxed"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              placeholder={status === 'vague' ? "Answer the clarifying questions..." : "Ask anything..."}
-              autoFocus
-              rows={1}
-              onInput={(e) => {
-                e.target.style.height = 'auto';
-                e.target.style.height = Math.min(e.target.scrollHeight, 200) + 'px';
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSubmit(e);
-                }
-              }}
-            />
+            <div className={`transition-all duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] ${status === 'processing' ? 'ai-glow-wrapper shadow-md scale-[1.01]' : 'p-0 shadow-sm rounded-2xl'}`}>
+              <form onSubmit={handleSubmit} className={`relative flex flex-col rounded-2xl transition-all ${status === 'processing' ? 'ai-glow-inner' : 'bg-surface-alt border border-border focus-within:border-geist-blue focus-within:ring-[3px] focus-within:ring-geist-blue/10'}`}>
+              <textarea
+                className="w-full bg-transparent border-none outline-none text-[15px] text-text-primary resize-none min-h-[60px] max-h-[200px] py-4 pl-5 pr-14 overflow-y-auto leading-relaxed"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder={status === 'vague' ? "Answer the clarifying questions..." : "Ask anything..."}
+                autoFocus
+                rows={1}
+                disabled={status === 'processing'}
+                onInput={(e) => {
+                  e.target.style.height = 'auto';
+                  e.target.style.height = Math.min(e.target.scrollHeight, 200) + 'px';
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit(e);
+                  }
+                }}
+              />
 
-            <button
-              type="submit"
-              disabled={!inputValue.trim() || status === 'processing'}
-              className="absolute right-3 bottom-3 w-8 h-8 rounded-full inline-flex items-center justify-center bg-black text-white hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:bg-surface disabled:text-text-muted disabled:border disabled:border-border"
-            >
-              {status === 'processing' ? <Loader2 size={16} className="animate-spin text-text-muted" /> : <ArrowRight size={16} />}
-            </button>
-          </form>
+              <button
+                type="submit"
+                disabled={!inputValue.trim() || status === 'processing'}
+                className="absolute right-3 bottom-3 w-8 h-8 rounded-full inline-flex items-center justify-center bg-black text-white hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:bg-surface disabled:text-text-muted disabled:border disabled:border-border"
+              >
+                {status === 'processing' ? <Loader2 size={16} className="animate-spin text-text-muted" /> : <ArrowRight size={16} />}
+              </button>
+            </form>
+            </div>
           )}
           <div className="text-center mt-4">
             <span className="text-[12px] font-medium text-text-muted">AI can make mistakes. Please review the generated structural schema.</span>

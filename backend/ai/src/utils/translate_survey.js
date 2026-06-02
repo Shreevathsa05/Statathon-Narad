@@ -1,5 +1,13 @@
 import { multilang_translator_agent } from "../models/agents.js";
 import { Survey } from "../mongodb/surveySchema.js";
+import { surveyLogs } from "../router/question_generation_route.js";
+
+function pushLog(id, msg) {
+    console.log(msg);
+    if (!id) return;
+    if (!surveyLogs.has(id)) surveyLogs.set(id, []);
+    surveyLogs.get(id).push(msg);
+}
 
 export default async function translate_survey(surveyId, languages) {
     try {
@@ -14,7 +22,7 @@ export default async function translate_survey(surveyId, languages) {
         const updatedSections = [];
 
         for (const section of survey.questionSections) {
-            console.log(`Translating section: ${section.sectionName}`);
+            pushLog(surveyId, `Translating section: ${section.sectionName}`);
 
             let translatedQuestions = null;
             let attempts = 0;
@@ -22,7 +30,7 @@ export default async function translate_survey(surveyId, languages) {
 
             while (attempts < maxAttempts) {
                 try {
-                    translatedQuestions = await multilang_translator_agent(section.questions, languages);
+                    translatedQuestions = await multilang_translator_agent(section.questions, languages, surveyId);
 
                     if (Array.isArray(translatedQuestions) && translatedQuestions.length > 0) {
                         break; // Success
