@@ -6,6 +6,7 @@ import authRoute from "./routes/authRoute.js";
 import userRoute from "./routes/userRoute.js";
 import surveyRoute from "./routes/surveyRoute.js";
 import responseRoute from "./routes/responseRoute.js";
+import demographicRoute from "./routes/demographicRoute.js";
 import { verifyJWT } from "./middleware/verifyJWT.js";
 
 const app = express();
@@ -26,6 +27,7 @@ app.use('/api/users', userRoute);
 // Protected data routes
 app.use('/api/survey', surveyRoute);
 app.use('/api/response', responseRoute);
+app.use('/api/demographic', demographicRoute);
 
 // Health check
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
