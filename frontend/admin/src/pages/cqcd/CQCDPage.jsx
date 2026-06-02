@@ -1,20 +1,22 @@
 import TopBar from '../../components/TopBar.jsx';
+import { Megaphone } from 'lucide-react';
 
 export default function CQCDPage() {
   return (
-    <div className="main-content">
+    <div className="flex flex-col flex-1 min-w-0 bg-bg">
       <TopBar title="CQCD Dashboard" />
-      <div className="page-body">
-        <div className="page-header">
-          <div className="page-header-left">
-            <h1>Publish Reports</h1>
-            <p>Coordination, Quality Control & Data Division</p>
+      <div className="flex flex-col p-6 w-full max-w-[1200px] mx-auto">
+        <div className="flex items-center justify-between pb-6 mb-6 border-b border-border">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-text-primary mb-1">Publish Reports</h1>
+            <p className="text-sm text-text-muted">Coordination, Quality Control & Data Division</p>
           </div>
         </div>
-        <div className="card">
-          <div className="card-body">
-            <p>CQCD specific tools will go here (Raw report review, final publication workflow).</p>
-          </div>
+        
+        <div className="flex flex-col items-center justify-center py-20 px-4 text-center bg-surface border border-dashed border-border rounded-md text-text-muted opacity-0 animate-fade-in-card">
+          <Megaphone size={48} className="opacity-20 mb-4" />
+          <h3 className="font-semibold text-lg text-text-primary">Reports Module Pending</h3>
+          <p className="text-sm max-w-md">CQCD specific tools will go here (Raw report review, final publication workflow).</p>
         </div>
       </div>
     </div>

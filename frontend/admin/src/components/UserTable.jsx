@@ -26,8 +26,12 @@ export default function UserTable({ users, onSuspend, onDelete }) {
           </tr>
         </thead>
         <tbody>
-          {users.map(u => (
-            <tr key={u._id} className={`border-b border-border ${u.status === 'suspended' ? 'opacity-60' : ''}`}>
+          {users.map((u, index) => (
+            <tr 
+              key={u._id} 
+              className={`border-b border-border opacity-0 animate-fade-in-card ${u.status === 'suspended' ? 'bg-black/5 [&>td]:opacity-60' : ''}`}
+              style={{ animationDelay: `${index * 30}ms` }}
+            >
               <td className="px-4 py-3 font-medium text-text-primary">{u.name}</td>
               <td className="px-4 py-3 font-mono text-text-muted">{u.email}</td>
               <td className="px-4 py-3"><RoleBadge role={u.role} /></td>
