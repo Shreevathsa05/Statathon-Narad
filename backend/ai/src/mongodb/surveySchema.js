@@ -63,10 +63,9 @@ const QuestionSchema = new mongoose.Schema({
     audio: {
         type: Map,
         of: {
-            type: String,
-            minlength: 1,
+            type: String
         },
-        required: true,
+        required: false,
     },
 
     options: {

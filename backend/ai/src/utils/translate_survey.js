@@ -10,7 +10,7 @@ export default async function translate_survey(surveyId, languages) {
             throw new Error(`Survey not found: ${surveyId}`);
         }
 
-        const newLanguages = Array.from(new Set([...languages]));
+        const newLanguages = Array.from(new Set([...(survey.supportedLanguages || []), ...languages]));
         const updatedSections = [];
 
         for (const section of survey.questionSections) {
@@ -124,7 +124,7 @@ export default async function translate_survey(surveyId, languages) {
 
         // Revert status on critical failure
         try {
-            await Survey.findOneAndUpdate({ surveyId }, { $set: { status: "complete" } });
+            await Survey.findOneAndUpdate({ surveyId }, { $set: { status: "pending" } });
         } catch (e) { }
 
         throw error;
