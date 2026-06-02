@@ -12,7 +12,7 @@ question_generation_router.get('/', (req, res) => {
 });
 
 question_generation_router.post('/generate_questions_english', async (req, res) => {
-    const { user_query, improved_answers } = req.body;
+    const { survey_name, user_query, improved_answers } = req.body;
 
     if (!user_query) {
         return res.status(400).json({ error: "user_query is required" });
@@ -40,7 +40,7 @@ question_generation_router.post('/generate_questions_english', async (req, res) 
         // Create an initial placeholder document in Mongo
         const initialSurvey = new Survey({
             surveyId: surveyId,
-            name: `Survey on ${user_query}`.substring(0, 100),
+            name: survey_name,
             status: "pending",
             supportedLanguages: ["english"],
             questionSections: [], // Empty initially
@@ -148,9 +148,11 @@ question_generation_router.post('/generate_questions_multilang', async (req, res
 
         // Fire and forget translation
         import("../utils/translate_survey.js").then(({ default: translate_survey }) => {
-            translate_survey(surveyId, languages).catch(err => {
-                console.error(`Translation failed for ${surveyId}:`, err);
-            });
+            translate_survey(surveyId, languages)
+                .then(() => console.log(`Translation finished for ${surveyId}`))
+                .catch(err => {
+                    console.error(`Translation failed for ${surveyId}:`, err);
+                });
         });
 
         res.json({
@@ -174,7 +176,8 @@ question_generation_router.get('/poll_questions_multilang/:surveyId', async (req
             return res.status(404).json({ error: "Survey not found." });
         }
 
-        if (survey.status === "complete") {
+        // "pending" implies translation finished since it transitions from "translating"
+        if (survey.status === "pending" || survey.status === "complete") {
             return res.json({ status: "completed", data: survey });
         } else {
             return res.json({ status: "processing" });

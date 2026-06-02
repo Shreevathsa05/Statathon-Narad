@@ -8,6 +8,9 @@ const mcp_client = new MultiServerMCPClient({
     mospi: {
         transport: "http",
         url: process.env.MOSPI_MCP_URI,
+        reconnect: {
+            enabled: true
+        }
     }
 })
 
