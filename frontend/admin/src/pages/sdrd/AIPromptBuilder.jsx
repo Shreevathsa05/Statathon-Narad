@@ -9,12 +9,15 @@ export default function AIPromptBuilder() {
   
   const [inputValue, setInputValue] = useState('');
   const [messages, setMessages] = useState([]);
-  // States: 'idle', 'processing', 'vague', 'completed', 'error'
+  // States: 'idle', 'processing', 'vague', 'needs_title', 'completed', 'error'
   const [status, setStatus] = useState('idle');
   const [surveyId, setSurveyId] = useState(null);
   const [error, setError] = useState(null);
   const [agentLogs, setAgentLogs] = useState([]);
   const [generatedSurvey, setGeneratedSurvey] = useState(null);
+  
+  const [initialQuery, setInitialQuery] = useState('');
+  const [clarification, setClarification] = useState('');
   
   // Mock Agentic UI States
   const [agentStep, setAgentStep] = useState(0);
@@ -39,36 +42,44 @@ export default function AIPromptBuilder() {
     e.preventDefault();
     if (!inputValue.trim() || status === 'processing' || status === 'completed') return;
     
-    const isClarification = status === 'vague';
     const currentInput = inputValue.trim();
     
     setMessages(prev => [...prev, { role: 'user', content: currentInput }]);
     setInputValue('');
-    setStatus('processing');
     setError(null);
     setAgentStep(0);
     
+    const prevStatus = status;
+    setStatus('processing');
+    
     try {
       let res;
-      if (isClarification) {
-        const originalQuery = messages.find(m => m.role === 'user')?.content || currentInput;
-        res = await aiClient.generateEnglishQuestions(originalQuery, currentInput);
-      } else {
+      if (prevStatus === 'idle') {
+        setInitialQuery(currentInput);
         res = await aiClient.generateEnglishQuestions(currentInput);
+      } else if (prevStatus === 'vague') {
+        setClarification(currentInput);
+        res = await aiClient.generateEnglishQuestions(initialQuery, currentInput);
+      } else if (prevStatus === 'needs_title') {
+        res = await aiClient.generateEnglishQuestions(initialQuery, clarification, currentInput);
       }
       
       if (res.status === 'vague') {
         setMessages(prev => [...prev, { role: 'assistant', type: 'clarification', questions: res.questions }]);
         setStatus('vague');
+      } else if (res.status === 'needs_title') {
+        setMessages(prev => [...prev, { role: 'assistant', content: "Great! Please provide a title for this survey." }]);
+        setStatus('needs_title');
       } else if (res.status === 'processing' && res.surveyId) {
         setSurveyId(res.surveyId);
+        setStatus('processing');
       } else {
         throw new Error('Unexpected API response');
       }
     } catch (err) {
       console.error(err);
       setError(err.message);
-      setStatus(isClarification ? 'vague' : 'idle');
+      setStatus(prevStatus);
     }
   };
 
@@ -176,7 +187,7 @@ export default function AIPromptBuilder() {
           ))}
 
           {/* Agentic UI - ReAct Chain of Thought */}
-          {(status === 'processing' || status === 'vague' || status === 'completed') && (
+          {(status === 'processing' || status === 'vague' || status === 'needs_title' || status === 'completed') && (
             <div className="flex gap-4">
               <div className="w-8 h-8 rounded-full bg-white border border-border flex items-center justify-center text-geist-blue shrink-0 mt-1 shadow-sm relative z-10 overflow-hidden">
                 <Sparkles size={14} className="animate-pulse" />
@@ -186,7 +197,7 @@ export default function AIPromptBuilder() {
                 <div className="flex flex-col gap-5 font-mono text-[13px] relative z-10">
                   <div className={`flex items-start gap-3 transition-opacity duration-500 bg-bg ${agentStep >= 0 ? 'text-text-primary' : 'text-text-muted opacity-30'}`}>
                     <div className="bg-bg py-1">
-                      {agentStep > 0 || status === 'vague' ? <CheckCircle2 size={16} className="text-geist-blue shrink-0" /> : <Loader2 size={16} className="animate-spin text-text-muted shrink-0" />}
+                      {agentStep > 0 || status === 'vague' || status === 'needs_title' ? <CheckCircle2 size={16} className="text-geist-blue shrink-0" /> : <Loader2 size={16} className="animate-spin text-text-muted shrink-0" />}
                     </div>
                     <span className="py-1"><strong className="font-semibold text-text-secondary mr-2">[Analyze]</strong> Parsing context and establishing target demographics...</span>
                   </div>
@@ -198,7 +209,15 @@ export default function AIPromptBuilder() {
                       <span className="py-1"><strong className="font-semibold text-text-secondary mr-2">[Clarify]</strong> Awaiting your response to finalize schema parameters...</span>
                     </div>
                   )}
-                  {agentStep >= 1 && status !== 'vague' && (
+                  {status === 'needs_title' && (
+                    <div className={`flex items-start gap-3 transition-opacity duration-500 animate-[modalIn_0.3s_ease-out] bg-bg text-text-primary`}>
+                      <div className="bg-bg py-1">
+                        <Loader2 size={16} className="animate-spin text-geist-blue shrink-0" />
+                      </div>
+                      <span className="py-1"><strong className="font-semibold text-text-secondary mr-2">[Name Survey]</strong> Waiting for user input to name the survey...</span>
+                    </div>
+                  )}
+                  {agentStep >= 1 && status !== 'vague' && status !== 'needs_title' && (
                     <div className={`flex items-start gap-3 transition-opacity duration-500 animate-[modalIn_0.3s_ease-out] bg-bg ${agentStep >= 1 ? 'text-text-primary' : 'text-text-muted opacity-30'}`}>
                       <div className="bg-bg py-1">
                         {agentStep > 1 ? <CheckCircle2 size={16} className="text-geist-blue shrink-0" /> : <Loader2 size={16} className="animate-spin text-text-muted shrink-0" />}
@@ -321,12 +340,12 @@ export default function AIPromptBuilder() {
             </button>
           ) : (
             <div className={`transition-all duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] ${status === 'processing' ? 'ai-glow-wrapper shadow-md scale-[1.01]' : 'p-0 shadow-sm rounded-2xl'}`}>
-              <form onSubmit={handleSubmit} className={`relative flex flex-col rounded-2xl transition-all ${status === 'processing' ? 'ai-glow-inner' : 'bg-surface-alt border border-border focus-within:border-geist-blue focus-within:ring-[3px] focus-within:ring-geist-blue/10'}`}>
+              <form onSubmit={handleSubmit} className={`relative flex flex-col rounded-2xl transition-all ${status === 'processing' ? 'ai-glow-inner' : 'bg-[#F0F0F0] border border-border focus-within:border-geist-blue focus-within:ring-[3px] focus-within:ring-geist-blue/10'}`}>
               <textarea
                 className="w-full bg-transparent border-none outline-none text-[15px] text-text-primary resize-none min-h-[60px] max-h-[200px] py-4 pl-5 pr-14 overflow-y-auto leading-relaxed"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                placeholder={status === 'vague' ? "Answer the clarifying questions..." : "Ask anything..."}
+                placeholder={status === 'needs_title' ? "Enter a title for your survey..." : (status === 'vague' ? "Answer the clarifying questions..." : "Ask anything...")}
                 autoFocus
                 rows={1}
                 disabled={status === 'processing'}

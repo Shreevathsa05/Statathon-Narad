@@ -16,25 +16,32 @@ question_generation_router.get('/', (req, res) => {
 });
 
 question_generation_router.post('/generate_questions_english', async (req, res) => {
-    const { user_query, improved_answers } = req.body;
+    const { survey_name, user_query, improved_answers } = req.body;
 
     if (!user_query) {
         return res.status(400).json({ error: "user_query is required" });
     }
 
-    // Only validate if improved_answers has not been provided yet
-    if (improved_answers === undefined) {
-        try {
-            const validation = await prompt_validation_agent(user_query);
-            if (validation && validation.is_vague) {
-                return res.json({
-                    status: "vague",
-                    questions: validation.questions || []
-                });
+    // Phase 1: If no survey_name is provided, we are validating or asking for a name
+    if (!survey_name) {
+        // If we don't have improved_answers yet, validate the initial prompt
+        if (improved_answers === undefined) {
+            try {
+                const validation = await prompt_validation_agent(user_query);
+                if (validation && validation.is_vague) {
+                    return res.json({
+                        status: "vague",
+                        questions: validation.questions || []
+                    });
+                }
+            } catch (e) {
+                console.error("Error during prompt validation (proceeding anyway):", e);
             }
-        } catch (e) {
-            console.error("Error during prompt validation (proceeding anyway):", e);
         }
+        
+        // If it's not vague, or the user already provided improved_answers,
+        // we now need the survey title before proceeding.
+        return res.json({ status: "needs_title" });
     }
 
     // Pre-generate a MongoDB surveyId
@@ -44,7 +51,7 @@ question_generation_router.post('/generate_questions_english', async (req, res) 
         // Create an initial placeholder document in Mongo
         const initialSurvey = new Survey({
             surveyId: surveyId,
-            name: `Survey on ${user_query}`.substring(0, 100),
+            name: survey_name,
             status: "pending",
             supportedLanguages: ["english"],
             questionSections: [], // Empty initially
@@ -154,9 +161,11 @@ question_generation_router.post('/generate_questions_multilang', async (req, res
 
         // Fire and forget translation
         import("../utils/translate_survey.js").then(({ default: translate_survey }) => {
-            translate_survey(surveyId, languages).catch(err => {
-                console.error(`Translation failed for ${surveyId}:`, err);
-            });
+            translate_survey(surveyId, languages)
+                .then(() => console.log(`Translation finished for ${surveyId}`))
+                .catch(err => {
+                    console.error(`Translation failed for ${surveyId}:`, err);
+                });
         });
 
         res.json({

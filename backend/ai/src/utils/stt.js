@@ -71,4 +71,3 @@ export async function stt_from_twilio_sarvam(url) {
     return transcription;
 }
 
-stt_from_twilio_whisper("https://api.twilio.com/2010-04-01/Accounts/AC17f953871067960b071d0468041b81d9/Recordings/REce7e4e5e8bb053c39d9c56a1453e4eb8");

@@ -194,7 +194,7 @@ export async function improve_section_agent(user_instructions, context_summarize
 }
 
 // multilang translator agent
-export async function multilang_translator_agent(existing_questions, target_languages, surveyId) {
+export async function multilang_translator_agent(question, target_languages, surveyId) {
     pushLog(surveyId, `Multilang Translator Agent Started for languages: ${target_languages.join(", ")}`);
 
     const translator = createAgent({
@@ -207,7 +207,7 @@ export async function multilang_translator_agent(existing_questions, target_lang
         messages: [
             {
                 role: "user",
-                content: `${multilang_translator_system_prompt}\n\nTarget Languages: ${target_languages.join(", ")}\n\nExisting English Questions:\n${JSON.stringify(existing_questions, null, 2)}`
+                content: `${multilang_translator_system_prompt}\n\nTarget Languages: ${target_languages.join(", ")}\n\nQuestion to translate:\n${JSON.stringify(question, null, 2)}`
             }
         ]
     }, { recursionLimit: 100 });
@@ -223,16 +223,7 @@ export async function multilang_translator_agent(existing_questions, target_lang
     if (typeof content === "string") {
         content = content.replace(/```json/gi, "").replace(/```/g, "").trim();
         try {
-            let parsed = JSON.parse(content);
-            if (parsed && !Array.isArray(parsed)) {
-                const keys = Object.keys(parsed);
-                if (keys.length === 1 && Array.isArray(parsed[keys[0]])) {
-                    parsed = parsed[keys[0]];
-                } else if (parsed.questions && Array.isArray(parsed.questions)) {
-                    parsed = parsed.questions;
-                }
-            }
-            return parsed;
+            return JSON.parse(content);
         } catch (e) {
             console.error("Failed to parse translator JSON:", e);
             console.log("Returning raw content due to parse failure.");
