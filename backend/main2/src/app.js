@@ -10,8 +10,15 @@ import { verifyJWT } from "./middleware/verifyJWT.js";
 
 const app = express();
 
+const allowedOrigins = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : [];
 app.use(cors({
-    origin: process.env.CORS_ORIGIN,
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true,          // Required for cookies to flow cross-origin
 }));
 app.use(express.json());
@@ -24,8 +31,8 @@ app.use('/api/auth', authRoute);
 app.use('/api/users', userRoute);
 
 // Protected data routes
-app.use('/api/survey', surveyRoute);
-app.use('/api/response', responseRoute);
+app.use('/api/survey', verifyJWT, surveyRoute);
+app.use('/api/response', verifyJWT, responseRoute);
 
 // Health check
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
