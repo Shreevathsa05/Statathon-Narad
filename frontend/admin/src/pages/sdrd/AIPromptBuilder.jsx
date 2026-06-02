@@ -4,6 +4,103 @@ import { aiClient } from '../../api/aiClient';
 import { Sparkles, ArrowRight, ArrowLeft, Loader2, AlertCircle, Bot, CheckCircle2 } from 'lucide-react';
 import { surveyClient } from '../../api/survey';
 
+const TypewriterMessage = ({ content, isList = false }) => {
+  const [visibleCount, setVisibleCount] = useState(0);
+  const [visibleListCounts, setVisibleListCounts] = useState([]);
+
+  useEffect(() => {
+    let timer;
+    let isMounted = true;
+
+    if (isList && Array.isArray(content)) {
+      const itemsWords = content.map(item => item.split(' '));
+      setVisibleListCounts(new Array(content.length).fill(0));
+      let currentItemIdx = 0;
+      let currentWordIdx = 0;
+
+      const typeNextWord = () => {
+        if (!isMounted) return;
+        if (currentItemIdx < itemsWords.length) {
+          setVisibleListCounts(prev => {
+            const next = [...prev];
+            next[currentItemIdx] = currentWordIdx + 1;
+            return next;
+          });
+          currentWordIdx++;
+          if (currentWordIdx >= itemsWords[currentItemIdx].length) {
+            currentWordIdx = 0;
+            currentItemIdx++;
+          }
+          timer = setTimeout(typeNextWord, 80);
+        }
+      };
+      typeNextWord();
+    } else if (typeof content === 'string') {
+      const words = content.split(' ');
+      let currentCount = 0;
+      setVisibleCount(0);
+      const typeNextWord = () => {
+        if (!isMounted) return;
+        if (currentCount < words.length) {
+          currentCount++;
+          setVisibleCount(currentCount);
+          timer = setTimeout(typeNextWord, 80);
+        }
+      };
+      typeNextWord();
+    }
+    
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [content, isList]);
+
+  if (isList) {
+    return (
+      <ul className="list-disc pl-4 m-0 space-y-1 text-text-secondary">
+        {content.map((item, i) => {
+          const words = item.split(' ');
+          const count = visibleListCounts[i] || 0;
+          if (count === 0) return null;
+          return (
+            <li key={i}>
+              {words.slice(0, count).map((word, wIdx) => (
+                <span key={wIdx} className="inline-block animate-word">{word}&nbsp;</span>
+              ))}
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+
+  const words = typeof content === 'string' ? content.split(' ') : [];
+  return (
+    <span>
+      {words.slice(0, visibleCount).map((word, i) => (
+        <span key={i} className="inline-block animate-word">{word}&nbsp;</span>
+      ))}
+    </span>
+  );
+};
+
+const ExitPromptModal = ({ onConfirm, onCancel }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
+    <div className="bg-white rounded-2xl p-6 w-[400px] shadow-xl animate-[modalIn_0.3s_ease-out]">
+      <h3 className="text-lg font-bold text-text-primary mb-2">Leave Survey Builder?</h3>
+      <p className="text-sm text-text-muted mb-6">You have an active AI prompt session. Leaving now will discard your progress. Are you sure you want to exit?</p>
+      <div className="flex justify-end gap-3">
+        <button onClick={onCancel} className="px-4 py-2 rounded-xl text-sm font-medium text-text-secondary hover:bg-surface-alt transition-colors">
+          Cancel
+        </button>
+        <button onClick={onConfirm} className="px-4 py-2 rounded-xl text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors">
+          Yes, Leave
+        </button>
+      </div>
+    </div>
+  </div>
+);
 export default function AIPromptBuilder() {
   const navigate = useNavigate();
   
@@ -133,13 +230,65 @@ export default function AIPromptBuilder() {
     };
   }, [status, surveyId]);
 
+  const [showExitPrompt, setShowExitPrompt] = useState(false);
+  const [pendingPath, setPendingPath] = useState(null);
+
+  useEffect(() => {
+    if (isInitial || status === 'completed' || status === 'error') return;
+
+    const handleBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    const handleGlobalClick = (e) => {
+      const link = e.target.closest('a');
+      if (link && link.href && link.hostname === window.location.hostname && link.target !== '_blank') {
+        const path = link.getAttribute('href');
+        // Get the relative path
+        const relativePath = path.replace(window.location.origin, '');
+        e.preventDefault();
+        e.stopPropagation();
+        setPendingPath(relativePath);
+        setShowExitPrompt(true);
+      }
+    };
+    document.addEventListener('click', handleGlobalClick, true);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('click', handleGlobalClick, true);
+    };
+  }, [isInitial, status]);
+
+  const confirmExit = () => {
+    setShowExitPrompt(false);
+    if (pendingPath) {
+      navigate(pendingPath);
+    }
+  };
+
+  const cancelExit = () => {
+    setShowExitPrompt(false);
+    setPendingPath(null);
+  };
+
   return (
     <div className="flex flex-col flex-1 min-w-0 h-screen bg-bg relative overflow-hidden">
+      {showExitPrompt && <ExitPromptModal onConfirm={confirmExit} onCancel={cancelExit} />}
       {/* Top Bar */}
       <div className="absolute top-0 left-0 right-0 p-6 z-10 bg-gradient-to-b from-bg via-bg to-transparent">
         <button 
           className="inline-flex items-center gap-2 text-sm font-medium text-text-muted hover:text-text-primary transition-colors"
-          onClick={() => navigate('/sdrd')}
+          onClick={() => {
+            if (!isInitial && status !== 'completed' && status !== 'error') {
+              setPendingPath('/sdrd');
+              setShowExitPrompt(true);
+            } else {
+              navigate('/sdrd');
+            }
+          }}
         >
           <ArrowLeft size={16} /> Back to Dashboard
         </button>
@@ -164,7 +313,7 @@ export default function AIPromptBuilder() {
         {/* Chat History */}
         <div className={`flex flex-col gap-8 transition-opacity duration-700 delay-300 ${messages.length === 0 ? 'opacity-0 hidden' : 'opacity-100'}`}>
           {messages.map((msg, idx) => (
-            <div key={idx} className={`flex gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div key={idx} className={`flex gap-4 ${msg.role === 'user' ? 'justify-end animate-user-msg' : 'justify-start animate-ai-msg'}`}>
               {msg.role === 'assistant' && (
                 <div className="w-8 h-8 rounded-full bg-white border border-border flex items-center justify-center text-geist-blue shrink-0 mt-1 shadow-sm">
                   <Sparkles size={14} />
@@ -175,19 +324,33 @@ export default function AIPromptBuilder() {
                 {msg.type === 'clarification' ? (
                   <div className="flex flex-col gap-3">
                     <p className="m-0 font-medium text-text-primary flex items-center gap-2">I need a bit more detail to finalize the schema:</p>
-                    <ul className="list-disc pl-4 m-0 space-y-1 text-text-secondary">
-                      {msg.questions.map((q, i) => <li key={i}>{q}</li>)}
-                    </ul>
+                    <TypewriterMessage content={msg.questions} isList={true} />
                   </div>
                 ) : (
-                  msg.content
+                  msg.role === 'assistant' ? <TypewriterMessage content={msg.content} /> : msg.content
                 )}
               </div>
             </div>
           ))}
 
+          {/* AI Thinking Bubble (Pre-generation) */}
+          {(status === 'processing' && !surveyId) && (
+            <div className="flex gap-4 justify-start animate-ai-msg">
+              <div className="w-8 h-8 rounded-full bg-white border border-border flex items-center justify-center text-geist-blue shrink-0 mt-1 shadow-sm">
+                <Sparkles size={14} className="animate-pulse" />
+              </div>
+              <div className="px-5 py-3.5 bg-white border border-border text-text-primary rounded-2xl rounded-tl-sm shadow-sm flex items-center justify-center h-[52px]">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-neutral-300 animate-[bounce_1s_infinite] [animation-delay:-0.3s]"></span>
+                  <span className="w-2 h-2 rounded-full bg-neutral-300 animate-[bounce_1s_infinite] [animation-delay:-0.15s]"></span>
+                  <span className="w-2 h-2 rounded-full bg-neutral-300 animate-[bounce_1s_infinite]"></span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Agentic UI - ReAct Chain of Thought */}
-          {(status === 'processing' || status === 'vague' || status === 'needs_title' || status === 'completed') && (
+          {((status === 'processing' && surveyId) || status === 'completed') && (
             <div className="flex gap-4">
               <div className="w-8 h-8 rounded-full bg-white border border-border flex items-center justify-center text-geist-blue shrink-0 mt-1 shadow-sm relative z-10 overflow-hidden">
                 <Sparkles size={14} className="animate-pulse" />
@@ -197,32 +360,22 @@ export default function AIPromptBuilder() {
                 <div className="flex flex-col gap-5 font-mono text-[13px] relative z-10">
                   <div className={`flex items-start gap-3 transition-opacity duration-500 bg-bg ${agentStep >= 0 ? 'text-text-primary' : 'text-text-muted opacity-30'}`}>
                     <div className="bg-bg py-1">
-                      {agentStep > 0 || status === 'vague' || status === 'needs_title' ? <CheckCircle2 size={16} className="text-geist-blue shrink-0" /> : <Loader2 size={16} className="animate-spin text-text-muted shrink-0" />}
+                      {agentStep > 0 ? <CheckCircle2 size={16} className="text-geist-blue shrink-0" /> : <Loader2 size={16} className="animate-spin text-text-muted shrink-0" />}
                     </div>
-                    <span className="py-1"><strong className="font-semibold text-text-secondary mr-2">[Analyze]</strong> Parsing context and establishing target demographics...</span>
+                    <span className="py-1">
+                      <strong className="font-semibold text-text-secondary mr-2">[Analyze]</strong>
+                      {agentStep >= 0 ? <TypewriterMessage content="Parsing context and establishing target demographics..." /> : "Parsing context and establishing target demographics..."}
+                    </span>
                   </div>
-                  {status === 'vague' && (
-                    <div className={`flex items-start gap-3 transition-opacity duration-500 animate-[modalIn_0.3s_ease-out] bg-bg text-text-primary`}>
-                      <div className="bg-bg py-1">
-                        <Loader2 size={16} className="animate-spin text-geist-blue shrink-0" />
-                      </div>
-                      <span className="py-1"><strong className="font-semibold text-text-secondary mr-2">[Clarify]</strong> Awaiting your response to finalize schema parameters...</span>
-                    </div>
-                  )}
-                  {status === 'needs_title' && (
-                    <div className={`flex items-start gap-3 transition-opacity duration-500 animate-[modalIn_0.3s_ease-out] bg-bg text-text-primary`}>
-                      <div className="bg-bg py-1">
-                        <Loader2 size={16} className="animate-spin text-geist-blue shrink-0" />
-                      </div>
-                      <span className="py-1"><strong className="font-semibold text-text-secondary mr-2">[Name Survey]</strong> Waiting for user input to name the survey...</span>
-                    </div>
-                  )}
-                  {agentStep >= 1 && status !== 'vague' && status !== 'needs_title' && (
+                  {agentStep >= 1 && (
                     <div className={`flex items-start gap-3 transition-opacity duration-500 animate-[modalIn_0.3s_ease-out] bg-bg ${agentStep >= 1 ? 'text-text-primary' : 'text-text-muted opacity-30'}`}>
                       <div className="bg-bg py-1">
                         {agentStep > 1 ? <CheckCircle2 size={16} className="text-geist-blue shrink-0" /> : <Loader2 size={16} className="animate-spin text-text-muted shrink-0" />}
                       </div>
-                      <span className="py-1"><strong className="font-semibold text-text-secondary mr-2">[Deploy]</strong> Initiating 5 parallel subagents for sector-specific sections...</span>
+                      <span className="py-1">
+                        <strong className="font-semibold text-text-secondary mr-2">[Deploy]</strong>
+                        <TypewriterMessage content="Initiating 5 parallel subagents for sector-specific sections..." />
+                      </span>
                     </div>
                   )}
                   {agentStep >= 2 && (
@@ -230,7 +383,10 @@ export default function AIPromptBuilder() {
                       <div className="bg-bg py-1">
                         {agentStep > 2 ? <CheckCircle2 size={16} className="text-geist-blue shrink-0" /> : <Loader2 size={16} className="animate-spin text-text-muted shrink-0" />}
                       </div>
-                      <span className="py-1"><strong className="font-semibold text-text-secondary mr-2">[Validate]</strong> Cross-referencing against standard NSS frameworks...</span>
+                      <span className="py-1">
+                        <strong className="font-semibold text-text-secondary mr-2">[Validate]</strong>
+                        <TypewriterMessage content="Cross-referencing against standard NSS frameworks..." />
+                      </span>
                     </div>
                   )}
                   {agentStep >= 3 && (
@@ -239,7 +395,10 @@ export default function AIPromptBuilder() {
                         {agentStep > 3 ? <CheckCircle2 size={16} className="text-geist-blue shrink-0" /> : <Loader2 size={16} className="animate-spin text-text-muted shrink-0" />}
                       </div>
                       <div className="flex flex-col py-1 w-full">
-                        <span><strong className="font-semibold text-text-secondary mr-2">[Compile]</strong> Assembling structural matrix for ID {surveyId || '...'}.</span>
+                        <span>
+                          <strong className="font-semibold text-text-secondary mr-2">[Compile]</strong>
+                          <TypewriterMessage content={`Assembling structural matrix for ID ${surveyId || '...'}.`} />
+                        </span>
                         {agentStep === 3 && (
                           <div className="mt-3 w-full">
                             <span className="text-[11px] text-text-muted animate-pulse block mb-2">This process involves multiple AI subagents and can take 60-90 seconds...</span>
@@ -249,7 +408,9 @@ export default function AIPromptBuilder() {
                                   const dist = agentLogs.length - 1 - i;
                                   const opacity = Math.max(0.3, 1 - dist * 0.25);
                                   return (
-                                    <div key={i} className="whitespace-pre-wrap transition-opacity duration-500" style={{ opacity }}>{log}</div>
+                                    <div key={i} className="whitespace-pre-wrap transition-opacity duration-500" style={{ opacity }}>
+                                      <TypewriterMessage content={log} />
+                                    </div>
                                   );
                                 })}
                               </div>

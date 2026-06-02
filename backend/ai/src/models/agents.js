@@ -245,10 +245,10 @@ export async function prompt_validation_agent(user_input) {
 
     const res = await validator.invoke({
         messages: [
-            {
-                role: "user",
-                content: `${prompt_validation_system_prompt}\n\nUser Input: ${user_input}`
-            }
+        {
+            role: "user",
+            content: `${prompt_validation_system_prompt}\n\nUser Input: ${user_input}`
+        }
         ]
     }, { recursionLimit: 100 });
 

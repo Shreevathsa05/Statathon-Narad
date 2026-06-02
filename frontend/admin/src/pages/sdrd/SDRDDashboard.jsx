@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { surveyClient } from '../../api/survey';
 import { Plus, Sparkles, Clock, Globe } from 'lucide-react';
+import TopBar from '../../components/TopBar.jsx';
 
-function SurveyCard({ survey, onClick }) {
+function SurveyCard({ survey, onClick, index = 0 }) {
   const questionCount = survey.questionSections?.reduce((acc, section) => acc + (section.questions?.length || 0), 0) || 0;
   const sectionCount = survey.questionSections?.length || 0;
   const languages = survey.supportedLanguages?.join(', ') || 'English';
@@ -15,7 +16,11 @@ function SurveyCard({ survey, onClick }) {
   }
 
   return (
-    <div className="bg-bg border border-border rounded-md shadow-sm p-4 flex flex-col gap-4 cursor-pointer hover:border-black hover:shadow-md transition-all h-full" onClick={onClick}>
+    <div 
+      className="bg-bg border border-border rounded-md shadow-sm p-4 flex flex-col gap-4 cursor-pointer hover:border-black hover:shadow-md transition-all h-full opacity-0 animate-fade-in-card" 
+      onClick={onClick}
+      style={{ animationDelay: `${index * 50}ms` }}
+    >
       <div className="flex justify-between items-start gap-3">
         <h3 className="text-base font-medium text-text-primary m-0 leading-tight line-clamp-2 overflow-hidden">
           {displayName}
@@ -74,6 +79,7 @@ export default function SDRDDashboard() {
 
   return (
     <div className="flex flex-col flex-1 min-w-0 bg-bg">
+      <TopBar title="SDRD Dashboard" />
       <div className="flex flex-col p-6 w-full max-w-[1200px] mx-auto">
       {/* Page Header */}
       <div className="flex items-center justify-between pb-6 mb-6 border-b border-border">
@@ -127,8 +133,8 @@ export default function SDRDDashboard() {
         </div>
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">
-          {surveys.map(survey => (
-            <SurveyCard key={survey.surveyId} survey={survey} onClick={() => navigate(`/sdrd/editor/${survey.surveyId}`)} />
+          {surveys.map((survey, index) => (
+            <SurveyCard key={survey.surveyId} survey={survey} onClick={() => navigate(`/sdrd/editor/${survey.surveyId}`)} index={index} />
           ))}
         </div>
       )}

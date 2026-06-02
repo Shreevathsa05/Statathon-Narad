@@ -15,6 +15,7 @@ import {
   Search,
   LogOut
 } from 'lucide-react';
+import { useToast } from '../context/ToastContext.jsx';
 
 // Role → nav sections map
 const NAV = {
@@ -69,6 +70,7 @@ const NAV = {
 export default function Sidebar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const toast = useToast();
 
   if (!user) return null;
 
@@ -76,6 +78,7 @@ export default function Sidebar() {
 
   const handleLogout = async () => {
     await logout();
+    toast.info('You have been logged out');
     navigate('/login');
   };
 
@@ -97,7 +100,7 @@ export default function Sidebar() {
               key={to}
               to={to}
               end={to === '/admin/users' || to === '/sdrd' || to === '/fod' || to === '/dpd' || to === '/cqcd'}
-              className={({ isActive }) => `flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${isActive ? 'bg-black/5 text-text-primary font-medium' : 'text-text-secondary hover:bg-black/5 hover:text-text-primary'}`}
+              className={({ isActive }) => `relative flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${isActive ? 'bg-black/5 text-text-primary font-medium before:absolute before:inset-y-1.5 before:left-[-8px] before:w-1 before:bg-black before:rounded-r-full' : 'text-text-secondary hover:bg-black/5 hover:text-text-primary'}`}
             >
               <Icon size={16} className="shrink-0 opacity-70" />
               {label}
