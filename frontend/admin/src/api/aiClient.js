@@ -1,8 +1,11 @@
 export const aiClient = {
-  async generateEnglishQuestions(user_query, improved_answers) {
+  async generateEnglishQuestions(user_query, improved_answers, survey_name) {
     const payload = { user_query };
     if (improved_answers) {
       payload.improved_answers = improved_answers;
+    }
+    if (survey_name) {
+      payload.survey_name = survey_name;
     }
     
     const response = await fetch('/question-generation/generate_questions_english', {
