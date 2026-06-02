@@ -118,7 +118,7 @@ export default function Sidebar() {
         </div>
         <button 
           onClick={handleLogout}
-          className="flex items-center justify-start gap-2 px-2 h-9 w-full rounded-md text-sm font-medium text-text-muted bg-transparent hover:bg-surface hover:text-text-primary transition-colors"
+          className="flex items-center justify-start gap-2 px-2 h-9 w-full rounded-md text-sm font-medium text-geist-error/70 bg-transparent hover:bg-geist-error/10 hover:text-geist-error transition-colors"
         >
           <LogOut size={16} className="opacity-70" />
           Log out

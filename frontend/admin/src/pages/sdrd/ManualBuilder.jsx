@@ -7,26 +7,12 @@ export default function ManualBuilder() {
   const navigate = useNavigate();
   const [name, setName] = useState('');
   const [category, setCategory] = useState('');
-  const [languages, setLanguages] = useState(['english']);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const availableLanguages = [
-    "hindi", "english", "bengali", "telugu", "tamil", "marathi", 
-    "gujarati", "kannada", "malayalam", "odia", "punjabi", "urdu"
-  ];
-
-  const toggleLanguage = (lang) => {
-    if (languages.includes(lang)) {
-      setLanguages(languages.filter(l => l !== lang));
-    } else {
-      setLanguages([...languages, lang]);
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim() || languages.length === 0) return;
+    if (!name.trim()) return;
 
     setLoading(true);
     setError(null);
@@ -38,12 +24,70 @@ export default function ManualBuilder() {
         surveyId,
         name,
         status: 'pending',
-        supportedLanguages: languages,
+        supportedLanguages: ['english'],
         categories: category ? [category] : ['General'],
         questionSections: [
           {
-            sectionName: "Default Section",
-            questions: []
+            sectionName: "User Demographics",
+            questions: [
+              {
+                  qid: "fullname",
+                  type: "text",
+                  text: { english: "Full Name" },
+                  audio: { english: "" }
+              },
+              {
+                  qid: "age",
+                  type: "text",
+                  text: { english: "Age" },
+                  audio: { english: "" }
+              },
+              {
+                  qid: "gender",
+                  type: "mcq",
+                  text: { english: "Gender" },
+                  audio: { english: "" },
+                  options: [
+                      { id: "male", label: { english: "Male" } },
+                      { id: "female", label: { english: "Female" } },
+                      { id: "other", label: { english: "Other" } }
+                  ]
+              },
+              {
+                  qid: "primarylanguage",
+                  type: "text",
+                  text: { english: "Primary Language" },
+                  audio: { english: "" }
+              },
+              {
+                  qid: "uid-type",
+                  type: "mcq",
+                  text: { english: "UID Type" },
+                  audio: { english: "" },
+                  options: [
+                      { id: "aadhaar", label: { english: "Aadhaar" } },
+                      { id: "phone_no", label: { english: "Phone no." } },
+                  ]
+              },
+              {
+                  qid: "uid",
+                  type: "text",
+                  text: { english: "UID" },
+                  audio: { english: "" }
+              },
+              {
+                  qid: "pincode",
+                  type: "text",
+                  text: { english: "Pincode" },
+                  audio: { english: "" }
+              },
+              {
+                  qid: "area",
+                  type: "text",
+                  text: { english: "Area" },
+                  audio: { english: "" }
+              }
+            ]
           }
         ],
         createdBy: "SDRD_Admin"
@@ -112,29 +156,11 @@ export default function ManualBuilder() {
             />
           </div>
 
-          {/* Languages */}
-          <div className="flex flex-col gap-3">
-            <label className="text-sm font-medium text-text-primary">Supported Languages</label>
-            <div className="flex flex-wrap gap-2">
-              {availableLanguages.map(lang => (
-                <button
-                  type="button"
-                  key={lang}
-                  onClick={() => toggleLanguage(lang)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full border transition-colors capitalize ${languages.includes(lang) ? 'bg-black text-white border-black' : 'bg-white text-text-primary border-border hover:border-black'}`}
-                >
-                  {languages.includes(lang) && <Check size={14} />}
-                  {lang}
-                </button>
-              ))}
-            </div>
-          </div>
-
           {/* Submit */}
           <div className="pt-6 mt-2 border-t border-border">
             <button
               type="submit"
-              disabled={!name.trim() || languages.length === 0 || loading}
+              disabled={!name.trim() || loading}
               className="w-full inline-flex items-center justify-center gap-2 px-4 h-11 text-base font-medium rounded-md bg-black text-white hover:bg-neutral-800 transition-colors disabled:opacity-50"
             >
               {loading ? 'Creating framework...' : 'Create Empty Survey'}

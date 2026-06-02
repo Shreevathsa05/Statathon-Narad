@@ -22,19 +22,26 @@ question_generation_router.post('/generate_questions_english', async (req, res) 
         return res.status(400).json({ error: "user_query is required" });
     }
 
-    // Only validate if improved_answers has not been provided yet
-    if (improved_answers === undefined) {
-        try {
-            const validation = await prompt_validation_agent(user_query);
-            if (validation && validation.is_vague) {
-                return res.json({
-                    status: "vague",
-                    questions: validation.questions || []
-                });
+    // Phase 1: If no survey_name is provided, we are validating or asking for a name
+    if (!survey_name) {
+        // If we don't have improved_answers yet, validate the initial prompt
+        if (improved_answers === undefined) {
+            try {
+                const validation = await prompt_validation_agent(user_query);
+                if (validation && validation.is_vague) {
+                    return res.json({
+                        status: "vague",
+                        questions: validation.questions || []
+                    });
+                }
+            } catch (e) {
+                console.error("Error during prompt validation (proceeding anyway):", e);
             }
-        } catch (e) {
-            console.error("Error during prompt validation (proceeding anyway):", e);
         }
+        
+        // If it's not vague, or the user already provided improved_answers,
+        // we now need the survey title before proceeding.
+        return res.json({ status: "needs_title" });
     }
 
     // Pre-generate a MongoDB surveyId
@@ -182,11 +189,12 @@ question_generation_router.get('/poll_questions_multilang/:surveyId', async (req
             return res.status(404).json({ error: "Survey not found." });
         }
 
-        // "pending" implies translation finished since it transitions from "translating"
-        if (survey.status === "pending" || survey.status === "complete") {
+        if (survey.status === "pending") {
+            surveyLogs.delete(surveyId);
             return res.json({ status: "completed", data: survey });
         } else {
-            return res.json({ status: "processing" });
+            const logs = surveyLogs.get(surveyId) || [];
+            return res.json({ status: "processing", logs: logs });
         }
     } catch (err) {
         console.error("Error polling multilang survey:", err);
