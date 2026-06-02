@@ -3,11 +3,94 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { surveyClient } from '../../api/survey';
 import { aiClient } from '../../api/aiClient';
 import { ArrowLeft, Sparkles, CheckCircle2, AlertCircle, Save, X, Loader2, Globe, Check, Edit2, Trash2 } from 'lucide-react';
+import { useToast } from '../../context/ToastContext.jsx';
+
+const TypewriterMessage = ({ content, isList = false }) => {
+  const [visibleCount, setVisibleCount] = useState(0);
+  const [visibleListCounts, setVisibleListCounts] = useState([]);
+
+  useEffect(() => {
+    let timer;
+    let isMounted = true;
+
+    if (isList && Array.isArray(content)) {
+      const itemsWords = content.map(item => item.split(' '));
+      setVisibleListCounts(new Array(content.length).fill(0));
+      let currentItemIdx = 0;
+      let currentWordIdx = 0;
+
+      const typeNextWord = () => {
+        if (!isMounted) return;
+        if (currentItemIdx < itemsWords.length) {
+          setVisibleListCounts(prev => {
+            const next = [...prev];
+            next[currentItemIdx] = currentWordIdx + 1;
+            return next;
+          });
+          currentWordIdx++;
+          if (currentWordIdx >= itemsWords[currentItemIdx].length) {
+            currentWordIdx = 0;
+            currentItemIdx++;
+          }
+          timer = setTimeout(typeNextWord, 80);
+        }
+      };
+      typeNextWord();
+    } else if (typeof content === 'string') {
+      const words = content.split(' ');
+      let currentCount = 0;
+      setVisibleCount(0);
+      const typeNextWord = () => {
+        if (!isMounted) return;
+        if (currentCount < words.length) {
+          currentCount++;
+          setVisibleCount(currentCount);
+          timer = setTimeout(typeNextWord, 80);
+        }
+      };
+      typeNextWord();
+    }
+    
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [content, isList]);
+
+  if (isList) {
+    return (
+      <ul className="list-disc pl-4 m-0 space-y-1 text-text-secondary">
+        {content.map((item, i) => {
+          const words = item.split(' ');
+          const count = visibleListCounts[i] || 0;
+          if (count === 0) return null;
+          return (
+            <li key={i}>
+              {words.slice(0, count).map((word, wIdx) => (
+                <span key={wIdx} className="inline-block animate-word">{word}&nbsp;</span>
+              ))}
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+
+  const words = typeof content === 'string' ? content.split(' ') : [];
+  return (
+    <span>
+      {words.slice(0, visibleCount).map((word, i) => (
+        <span key={i} className="inline-block animate-word">{word}&nbsp;</span>
+      ))}
+    </span>
+  );
+};
 
 export default function SurveyEditor({ surveyId: propSurveyId }) {
   const { surveyId: paramSurveyId } = useParams();
   const surveyId = propSurveyId || paramSurveyId;
   const navigate = useNavigate();
+  const toast = useToast();
 
   const [survey, setSurvey] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -16,6 +99,8 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
   const [approving, setApproving] = useState(false);
 
   // Editable local state
+  const [localTitle, setLocalTitle] = useState('');
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [localSections, setLocalSections] = useState([]);
   const [hasChanges, setHasChanges] = useState(false);
   const [editingSections, setEditingSections] = useState({}); // Track edit mode per section
@@ -38,6 +123,17 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
   // Delete modal state
   const [deleteModal, setDeleteModal] = useState({ show: false, type: null, secIdx: null, qIdx: null, optIdx: null, message: '' });
 
+  // Generic error modal state
+  const [showErrorModal, setShowErrorModal] = useState(null);
+
+  const logContainerRef = React.useRef(null);
+
+  useEffect(() => {
+    if (logContainerRef.current) {
+      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+    }
+  }, [translateLogs]);
+
   const confirmDelete = () => {
     const { type, secIdx, qIdx, optIdx } = deleteModal;
     const updated = [...localSections];
@@ -52,9 +148,6 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
     setHasChanges(true);
     setDeleteModal({ show: false });
   };
-
-  // Generic error modal state
-  const [showErrorModal, setShowErrorModal] = useState(null);
 
   const AVAILABLE_LANGUAGES = [
     "hindi", "bengali", "telugu", "tamil", "marathi", "gujarati", 
@@ -71,6 +164,7 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
       const res = await surveyClient.getSurveyById(surveyId);
       const surveyData = res.data.data;
       setSurvey(surveyData);
+      setLocalTitle(surveyData.name || '');
       setLocalSections(surveyData.questionSections || []);
       // Reset selected langs when fetching fresh survey
       setSelectedLangs([]);
@@ -112,6 +206,7 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
             setShowLangPanel(false);
             setTranslateLogs([]);
             await fetchSurvey();
+            toast.success("Survey translated successfully");
           }
         } catch (err) {
           console.error("Polling error", err);
@@ -186,9 +281,10 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
     
     try {
       setSaving(true);
-      await surveyClient.updateSurvey(surveyId, { questionSections: localSections });
-      setSurvey(prev => ({ ...prev, questionSections: localSections }));
+      await surveyClient.updateSurvey(surveyId, { name: localTitle, questionSections: localSections });
+      setSurvey(prev => ({ ...prev, name: localTitle, questionSections: localSections }));
       setHasChanges(false);
+      toast.success("Changes saved as draft");
     } catch (err) {
       setShowErrorModal("Failed to save changes.");
     } finally {
@@ -207,6 +303,7 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
         await fetchSurvey(false);
         setActiveImproveSection(null);
         setImproveInstructions('');
+        toast.success(`Section "${sectionName}" improved successfully`);
       }
     } catch (err) {
       setShowErrorModal("AI Improvement failed: " + err.message);
@@ -387,7 +484,40 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
           >
             <ArrowLeft size={16} /> Back to Dashboard
           </button>
-          <h1 className="text-2xl font-bold tracking-tight text-text-primary mb-2 break-words">{survey.name}</h1>
+          {isEditingTitle ? (
+            <div className="flex items-center gap-3 mb-2 w-full max-w-[800px]">
+              <input 
+                type="text"
+                className="text-2xl font-bold tracking-tight text-text-primary flex-1 bg-transparent border-b border-dashed border-border hover:border-text-primary focus:border-geist-blue outline-none transition-colors px-1 py-1"
+                value={localTitle}
+                onChange={(e) => {
+                  setLocalTitle(e.target.value);
+                  setHasChanges(true);
+                }}
+                placeholder="Survey Title"
+                autoFocus
+              />
+              <button 
+                className="inline-flex items-center justify-center gap-1.5 px-3 h-8 text-xs font-medium rounded bg-black text-white hover:bg-neutral-800 transition-colors shrink-0"
+                onClick={() => setIsEditingTitle(false)}
+              >
+                Done
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 mb-2 group flex-wrap">
+              <h1 className="text-2xl font-bold tracking-tight text-text-primary break-words m-0">{localTitle}</h1>
+              {isPending && (
+                <button
+                  className="inline-flex items-center justify-center gap-1.5 px-2.5 h-7 text-xs font-medium rounded bg-surface border border-border text-text-muted hover:bg-surface-alt hover:text-text-primary transition-colors shrink-0"
+                  onClick={() => setIsEditingTitle(true)}
+                  disabled={isTranslationLocked || saving || approving}
+                >
+                  <Edit2 size={14} /> Edit Title
+                </button>
+              )}
+            </div>
+          )}
           <div className="flex items-center gap-4 mt-2">
             <span className="text-xs text-text-muted font-mono shrink-0">ID: {survey.surveyId}</span>
             <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-medium rounded-full border uppercase tracking-wider shrink-0 ${
@@ -460,17 +590,16 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
           </div>
           
           {translateStatus === 'processing' && translateLogs.length > 0 && (
-            <div className="mt-6 bg-surface-alt rounded-lg border border-border p-4 h-[200px] overflow-y-auto flex flex-col gap-3 font-mono text-xs shadow-sm">
-              {translateLogs.map((log, i) => (
-                <div key={i} className="flex items-start gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                  <span className="text-text-muted shrink-0 select-none">&gt;</span>
-                  <span className="text-text-primary leading-relaxed">{log}</span>
-                </div>
-              ))}
-              <div className="flex items-center gap-2 mt-2 opacity-50">
-                <span className="text-text-muted select-none">&gt;</span>
-                <span className="w-1.5 h-3 bg-text-primary animate-pulse"></span>
-              </div>
+            <div className="mt-6 w-full bg-white border border-border/60 rounded-md p-3 max-h-28 overflow-y-auto text-[11px] font-mono text-text-muted flex flex-col gap-1 shadow-inner scrollbar-thin" ref={logContainerRef}>
+              {translateLogs.map((log, i) => {
+                const dist = translateLogs.length - 1 - i;
+                const opacity = Math.max(0.3, 1 - dist * 0.25);
+                return (
+                  <div key={i} className="whitespace-pre-wrap transition-opacity duration-500" style={{ opacity }}>
+                    <TypewriterMessage content={log} />
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -522,7 +651,10 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
                   {sec.sectionName === survey?.questionSections?.[secIdx]?.sectionName && sec.sectionName?.toLowerCase() !== 'user demographics' && (
                     <button
                       className="inline-flex items-center gap-1.5 px-2.5 h-7 text-xs font-medium rounded text-geist-blue bg-geist-blue/10 border border-geist-blue/20 hover:bg-geist-blue/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      onClick={() => setActiveImproveSection(sec.sectionName)}
+                      onClick={() => {
+                        setActiveImproveSection(sec.sectionName);
+                        setImproveInstructions('');
+                      }}
                       disabled={isTranslationLocked || improvingStatus === 'processing'}
                     >
                       <Sparkles size={14} /> AI Improve
@@ -573,7 +705,10 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
                     {improvingStatus === 'processing' ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} 
                     Regenerate
                   </button>
-                  <button type="button" className="inline-flex items-center justify-center w-9 h-9 rounded text-text-muted hover:bg-surface hover:text-text-primary transition-colors" onClick={() => setActiveImproveSection(null)}>
+                  <button type="button" className="inline-flex items-center justify-center w-9 h-9 rounded text-text-muted hover:bg-surface hover:text-text-primary transition-colors" onClick={() => {
+                    setActiveImproveSection(null);
+                    setImproveInstructions('');
+                  }}>
                     <X size={20} />
                   </button>
                 </form>
