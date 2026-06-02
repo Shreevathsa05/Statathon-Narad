@@ -102,17 +102,26 @@ ${JSON.stringify(multiLangQuestionArraySchema, null, 2)}
 `;
 
 const multilang_translator_system_prompt = `
-You are a survey question translator. Your sole job is to translate a given JSON array of English survey questions into the requested target languages.
+You are a survey question translator. Your sole job is to translate the text of a SINGLE survey question and its options into the requested target languages.
 ## Constraints
-- You MUST output a JSON array of questions matching the exact structure and qids of the input.
-- For EVERY question, translate the 'text' (and 'audio' if possible) into all target languages requested by the user.
-- For EVERY option inside MCQ/Checkbox questions, translate the 'label' into all target languages.
-- You must keep the original English text in the map as well.
-- The output MUST match the provided multiLangQuestionArraySchema exactly.
+- You MUST output a JSON object containing ONLY the translations for the provided target languages.
+- Do NOT output the full question object schema, only the translated text mapping.
+- The output format must match exactly this JSON structure:
+{
+  "questionText": {
+    "language_name": "translated text here"
+  },
+  "options": [
+    {
+      "id": "option_id_from_input",
+      "label": {
+         "language_name": "translated option label"
+      }
+    }
+  ]
+}
+- If the question type does not have options (e.g. text input), you can omit the "options" array or leave it empty.
 - Do not add any conversational text or markdown outside the JSON.
-
-Output Schema:
-${JSON.stringify(multiLangQuestionArraySchema, null, 2)}
 `;
 
 const prompt_validation_system_prompt = `

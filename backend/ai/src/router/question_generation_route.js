@@ -3,6 +3,10 @@ import { Router } from "express";
 import crypto from "crypto";
 import { Survey } from "../mongodb/surveySchema.js";
 import generate_english_questions_retry from "../utils/generate_questions.js";
+import { prompt_validation_agent } from "../models/agents.js";
+
+// In-memory store for real-time generation logs
+export const surveyLogs = new Map();
 
 const question_generation_router = Router();
 
@@ -12,7 +16,7 @@ question_generation_router.get('/', (req, res) => {
 });
 
 question_generation_router.post('/generate_questions_english', async (req, res) => {
-    const { user_query, improved_answers } = req.body;
+    const { survey_name, user_query, improved_answers } = req.body;
 
     if (!user_query) {
         return res.status(400).json({ error: "user_query is required" });
@@ -40,7 +44,7 @@ question_generation_router.post('/generate_questions_english', async (req, res) 
         // Create an initial placeholder document in Mongo
         const initialSurvey = new Survey({
             surveyId: surveyId,
-            name: `Survey on ${user_query}`.substring(0, 100),
+            name: survey_name,
             status: "pending",
             supportedLanguages: ["english"],
             questionSections: [], // Empty initially
@@ -79,11 +83,13 @@ question_generation_router.get('/poll_questions_english/:surveyId', async (req, 
             return res.status(404).json({ error: "Survey not found." });
         }
 
-        // Using "complete" to signal done, or just checking questionSections length
-        if (survey.status === "complete" || (survey.questionSections && survey.questionSections.length > 0)) {
+        // Wait for questionSections to be populated by the background task
+        if (survey.questionSections && survey.questionSections.length > 0) {
+            surveyLogs.delete(surveyId); // cleanup
             return res.json({ status: "completed", data: survey });
         } else {
-            return res.json({ status: "processing" });
+            const logs = surveyLogs.get(surveyId) || [];
+            return res.json({ status: "processing", logs: logs });
         }
     } catch (err) {
         console.error("Error polling survey:", err);
@@ -114,8 +120,8 @@ question_generation_router.post('/improve_section_english', async (req, res) => 
         await improve_english_section(surveyId, sectionName, instructions);
 
         console.log(`Section ${sectionName} improved for ${surveyId}`);
-        // Revert status to complete
-        await Survey.findOneAndUpdate({ surveyId }, { $set: { status: "complete" } });
+        // Revert status to pending
+        await Survey.findOneAndUpdate({ surveyId }, { $set: { status: "pending" } });
 
         res.json({
             surveyId: surveyId,
@@ -125,8 +131,8 @@ question_generation_router.post('/improve_section_english', async (req, res) => 
 
     } catch (e) {
         console.error("Error initiating section improvement:", e);
-        // Revert status to complete in case of error so it's not stuck
-        Survey.findOneAndUpdate({ surveyId }, { $set: { status: "complete" } }).exec();
+        // Revert status to pending in case of error so it's not stuck
+        Survey.findOneAndUpdate({ surveyId }, { $set: { status: "pending" } }).exec();
         return res.status(500).json({ error: "Internal Server Error" });
     }
 });
@@ -148,9 +154,11 @@ question_generation_router.post('/generate_questions_multilang', async (req, res
 
         // Fire and forget translation
         import("../utils/translate_survey.js").then(({ default: translate_survey }) => {
-            translate_survey(surveyId, languages).catch(err => {
-                console.error(`Translation failed for ${surveyId}:`, err);
-            });
+            translate_survey(surveyId, languages)
+                .then(() => console.log(`Translation finished for ${surveyId}`))
+                .catch(err => {
+                    console.error(`Translation failed for ${surveyId}:`, err);
+                });
         });
 
         res.json({
@@ -174,7 +182,8 @@ question_generation_router.get('/poll_questions_multilang/:surveyId', async (req
             return res.status(404).json({ error: "Survey not found." });
         }
 
-        if (survey.status === "complete") {
+        // "pending" implies translation finished since it transitions from "translating"
+        if (survey.status === "pending" || survey.status === "complete") {
             return res.json({ status: "completed", data: survey });
         } else {
             return res.json({ status: "processing" });

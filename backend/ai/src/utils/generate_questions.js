@@ -3,6 +3,14 @@ import { Survey } from "../mongodb/surveySchema.js";
 import SurveyPlan from "../mongodb/surveyPlan.js";
 import connectDB from "../mongodb/connect.js";
 import crypto from "crypto";
+import { surveyLogs } from "../router/question_generation_route.js";
+
+function pushLog(id, msg) {
+    console.log(msg);
+    if (!id) return;
+    if (!surveyLogs.has(id)) surveyLogs.set(id, []);
+    surveyLogs.get(id).push(msg);
+}
 
 export async function generate_english_questions(user_input, surveyId) {
     // 1. Ensure DB connection
@@ -10,16 +18,16 @@ export async function generate_english_questions(user_input, surveyId) {
 
     const id = surveyId;
 
-    console.log("Starting full generation pipeline for:", user_input);
+    pushLog(id, `Starting full generation pipeline for: ${user_input}`);
 
     // 2. Collect Context
-    const context = await context_collector_agent(user_input);
+    const context = await context_collector_agent(user_input, id);
     if (!context) {
         throw new Error("No context found from MoSPI");
     }
 
     // 3. Plan Sections
-    const sectionsPlan = await section_planner_agent(user_input, context);
+    const sectionsPlan = await section_planner_agent(user_input, context, id);
     if (!Array.isArray(sectionsPlan) || sectionsPlan.length === 0) {
         throw new Error("Section planner failed to return valid sections array");
     }
@@ -96,12 +104,12 @@ export async function generate_english_questions(user_input, surveyId) {
     let allGeneratedQuestions = [...demographicsSection.questions];
 
     for (const section of sectionsPlan) {
-        console.log(`Generating questions for section: ${section.sectionName}`);
-        let questionsForSection = await question_generator_agent(user_input, context, section, allGeneratedQuestions);
+        pushLog(id, `Generating questions for section: ${section.sectionName}`);
+        let questionsForSection = await question_generator_agent(user_input, context, section, allGeneratedQuestions, id);
 
         // Safety check if response is not array
         if (!Array.isArray(questionsForSection)) {
-            console.log("Warning: generator did not return array, defaulting to empty");
+            pushLog(id, "Warning: generator did not return array, defaulting to empty");
             questionsForSection = [];
         }
 
@@ -114,9 +122,10 @@ export async function generate_english_questions(user_input, surveyId) {
     }
 
     // 5. Save survey contenxt
-    console.log("Planned Sections:", sectionsPlan.map(s => s.sectionName).join(", "));
+    // 5. Save survey contenxt
+    pushLog(id, `Planned Sections: ${sectionsPlan.map(s => s.sectionName).join(", ")}`);
 
-    console.log("Saving Survey Plan to MongoDB...");
+    pushLog(id, "Saving Survey Plan to MongoDB...");
     await SurveyPlan.findOneAndUpdate(
         { surveyId: id },
         {
@@ -140,7 +149,7 @@ export async function generate_english_questions(user_input, surveyId) {
         createdBy: "AI-Agent"
     };
 
-    console.log("Saving survey to MongoDB with ID:", surveyData.surveyId);
+    pushLog(id, `Saving survey to MongoDB with ID: ${surveyData.surveyId}`);
 
     // Upsert or Save
     const savedSurvey = await Survey.findOneAndUpdate(

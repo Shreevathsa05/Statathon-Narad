@@ -10,10 +10,18 @@ import {
     multilang_translator_system_prompt,
     prompt_validation_system_prompt
 } from "../prompts/question_generation/index.js";
+import { surveyLogs } from "../router/question_generation_route.js";
+
+function pushLog(id, msg) {
+    console.log(msg);
+    if (!id) return;
+    if (!surveyLogs.has(id)) surveyLogs.set(id, []);
+    surveyLogs.get(id).push(msg);
+}
 
 // context collector agent
-export async function context_collector_agent(user_input) {
-    console.log("Context Collector Agent Started");
+export async function context_collector_agent(user_input, surveyId) {
+    pushLog(surveyId, "Context Collector Agent Started");
     const collector = createAgent({
         model: llm_chat,
         tools: mcp_tools,
@@ -27,10 +35,10 @@ export async function context_collector_agent(user_input) {
                 content: `${context_collector_system_prompt}\n${user_input}`
             }
         ]
-    });
+    }, { recursionLimit: 100 });
 
     const final = getFinalMessage(res.messages);
-    console.log("Context Collector Agent Completed");
+    pushLog(surveyId, "Context Collector Agent Completed");
     return final;
 }
 
@@ -39,8 +47,8 @@ function getFinalMessage(messages) {
 }
 
 // section planner agent
-export async function section_planner_agent(user_input, context_extracted) {
-    console.log("Section Planner Agent Started");
+export async function section_planner_agent(user_input, context_extracted, surveyId) {
+    pushLog(surveyId, "Section Planner Agent Started");
     
     const planner = createAgent({
         model: llm_chat,
@@ -55,9 +63,9 @@ export async function section_planner_agent(user_input, context_extracted) {
                 content: `${section_planner_system_prompt}\n\nUser Input: ${user_input}\nContext Extracted: ${context_extracted}`
             }
         ]
-    });
+    }, { recursionLimit: 30 });
 
-    console.log("Section Planner Agent Completed");
+    pushLog(surveyId, "Section Planner Agent Completed");
     
     let content = getFinalMessage(res.messages);
     
@@ -88,8 +96,8 @@ export async function section_planner_agent(user_input, context_extracted) {
 }
 
 // question generator agent
-export async function question_generator_agent(user_input, context_summarized, section, previous_questions = []) {
-    console.log(`Question Generator Agent Started for section: ${section.sectionName}`);
+export async function question_generator_agent(user_input, context_summarized, section, previous_questions = [], surveyId) {
+    pushLog(surveyId, `Question Generator Agent Started for section: ${section.sectionName}`);
 
     const generator = createAgent({
         model: llm_chat,
@@ -104,9 +112,9 @@ export async function question_generator_agent(user_input, context_summarized, s
                 content: `${question_generator_system_prompt}\n\nTopic: ${user_input}\nMOSPI extracted Context: ${context_summarized}\n\nSection to Generate: ${JSON.stringify(section, null, 2)}\n\nPreviously Generated Questions (DO NOT REPEAT THESE):\n${JSON.stringify(previous_questions, null, 2)}`
             }
         ]
-    });
+    }, { recursionLimit: 100 });
 
-    console.log(`Question Generator Agent Completed for section: ${section.sectionName}`);
+    pushLog(surveyId, `Question Generator Agent Completed for section: ${section.sectionName}`);
     
     let content = getFinalMessage(res.messages);
     
@@ -153,7 +161,7 @@ export async function improve_section_agent(user_instructions, context_summarize
                 content: `${improve_section_system_prompt_english}\n\nMOSPI extracted Context: ${context_summarized}\n\nSection Description: ${JSON.stringify(section, null, 2)}\n\nExisting Questions:\n${JSON.stringify(current_questions, null, 2)}\n\nUser Instructions for Improvement:\n${user_instructions}`
             }
         ]
-    });
+    }, { recursionLimit: 100 });
 
     console.log(`Improve Section Agent Completed for section: ${section.sectionName}`);
     
@@ -186,7 +194,7 @@ export async function improve_section_agent(user_instructions, context_summarize
 }
 
 // multilang translator agent
-export async function multilang_translator_agent(existing_questions, target_languages) {
+export async function multilang_translator_agent(question, target_languages) {
     console.log(`Multilang Translator Agent Started for languages: ${target_languages.join(", ")}`);
 
     const translator = createAgent({
@@ -199,10 +207,10 @@ export async function multilang_translator_agent(existing_questions, target_lang
         messages: [
             {
                 role: "user",
-                content: `${multilang_translator_system_prompt}\n\nTarget Languages: ${target_languages.join(", ")}\n\nExisting English Questions:\n${JSON.stringify(existing_questions, null, 2)}`
+                content: `${multilang_translator_system_prompt}\n\nTarget Languages: ${target_languages.join(", ")}\n\nQuestion to translate:\n${JSON.stringify(question, null, 2)}`
             }
         ]
-    });
+    }, { recursionLimit: 100 });
 
     console.log(`Multilang Translator Agent Completed.`);
     
@@ -215,16 +223,7 @@ export async function multilang_translator_agent(existing_questions, target_lang
     if (typeof content === "string") {
         content = content.replace(/```json/gi, "").replace(/```/g, "").trim();
         try {
-            let parsed = JSON.parse(content);
-            if (parsed && !Array.isArray(parsed)) {
-                const keys = Object.keys(parsed);
-                if (keys.length === 1 && Array.isArray(parsed[keys[0]])) {
-                    parsed = parsed[keys[0]];
-                } else if (parsed.questions && Array.isArray(parsed.questions)) {
-                    parsed = parsed.questions;
-                }
-            }
-            return parsed;
+            return JSON.parse(content);
         } catch (e) {
             console.error("Failed to parse translator JSON:", e);
             console.log("Returning raw content due to parse failure.");
@@ -251,7 +250,7 @@ export async function prompt_validation_agent(user_input) {
                 content: `${prompt_validation_system_prompt}\n\nUser Input: ${user_input}`
             }
         ]
-    });
+    }, { recursionLimit: 100 });
 
     console.log(`Prompt Validation Agent Completed.`);
     
