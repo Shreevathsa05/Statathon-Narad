@@ -31,8 +31,8 @@ app.use('/api/auth', authRoute);
 app.use('/api/users', userRoute);
 
 // Protected data routes
-app.use('/api/survey', verifyJWT, surveyRoute);
-app.use('/api/response', verifyJWT, responseRoute);
+app.use('/api/survey', surveyRoute);
+app.use('/api/response', responseRoute);
 
 // Health check
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
