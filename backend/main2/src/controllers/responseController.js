@@ -20,7 +20,24 @@ export const submitSurveyResponse = asyncHandler(async (req, res) => {
         throw new ApiError(403, "Survey is not accepting responses");
     }
 
-    const { response, userInfo, paraInfo } = req.body;
+    const { response, paraInfo } = req.body;
+    if (!paraInfo ||
+        !paraInfo.interviewInfo.interviewMode ||
+        !paraInfo.interviewInfo.interviewStartTime
+    ) {
+        throw new ApiError(400, "Incomplete paraInfo");
+    }
+
+    const startTime = new Date(paraInfo.interviewInfo.interviewStartTime);
+    const endTime = new Date();
+
+    if (isNaN(startTime.getTime())) {
+        throw new ApiError(400, "Invalid start time");
+    }
+
+    if (startTime > endTime) {
+        throw new ApiError(400, "Start time cannot be in future");
+    }
 
     if (!Array.isArray(response) || response.length === 0) {
         throw new ApiError(400, "Response must be a non-empty array");
@@ -94,8 +111,14 @@ export const submitSurveyResponse = asyncHandler(async (req, res) => {
 
     const surveyResponse = await SurveyResponse.create({
         surveyId: survey._id,
-        userInfo,
-        paraInfo,
+        paraInfo: {
+            ...paraInfo,
+            interviewInfo: {
+                ...paraInfo.interviewInfo,
+                interviewStartTime: startTime,
+                interviewEndTime: endTime
+            }
+        },
         response
     });
 

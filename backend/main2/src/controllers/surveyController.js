@@ -84,7 +84,8 @@ export const createSurvey = asyncHandler(async (req, res) => {
 });
 
 export const getAllSurveys = asyncHandler(async (req, res) => {
-	const surveys = await Survey.find().select("name surveyId status createdBy	 createdAt");
+	console.log("req");
+	const surveys = await Survey.find().select("name surveyId status questionSections supportedLanguages createdAt");
 
 	return res
 		.status(200)
@@ -138,7 +139,7 @@ export const updateSurvey = asyncHandler(async (req, res) => {
 	const survey = await Survey.findOneAndUpdate(
 		{ surveyId: survey_id },
 		{ $set: updates },
-		{ new: true, runValidators: true },
+		{ returnDocument: 'after', runValidators: true }
 	);
 
 	if (!survey) {

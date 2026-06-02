@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import DynamicField from "../components/survey/DynamicField";
-import { shouldShowField } from "../components/survey/ConditionEvaluator";
-import { BASE_URL } from "../constants";
+import { shouldShowField } from "../utils/ConditionEvaluator";
+import { BASE_URL, START_TIME } from "../constants";
 import { speak } from "../utils/textToSpeech";
+import { getOS } from "../utils/getOS";
 
 export default function SurveyPage() {
     const navigate = useNavigate();
@@ -18,16 +19,14 @@ export default function SurveyPage() {
     const [consent, setConsent] = useState(null);
 
     const [language, setLanguage] = useState("english");
-    const [currentSpeak, setCurrentSpeak] = useState(null);
     const [supportedLanguages, setSupportedLanguages] = useState([]);
 
     useEffect(() => {
         (async () => {
             try {
                 const res = await fetch(`${BASE_URL}/survey/${surveyId}`);
-
                 const data = await res.json();
-                console.log(data)
+
                 if (!res.ok) {
                     setErrors(data.message || "Unable to load survey. Please try again.");
                     return;
@@ -38,10 +37,16 @@ export default function SurveyPage() {
                     return;
                 }
 
+                const ONE_HOUR = 60 * 60 * 1000;
+                const existingStartTime = localStorage.getItem(START_TIME);
+
+                if (!existingStartTime || (Date.now() - new Date(existingStartTime).getTime()) > ONE_HOUR) {
+                    localStorage.setItem(START_TIME, new Date().toISOString());
+                }
+
                 setQuestionSections(data?.data?.questionSections || []);
                 setSupportedLanguages(data?.data?.supportedLanguages);
-
-            } catch (error) {
+            } catch {
                 setErrors("Network error. Please check your connection.");
             } finally {
                 setLoading(false);
@@ -58,7 +63,6 @@ export default function SurveyPage() {
         try {
             if (!field.text?.[language]) return;
 
-            setCurrentSpeak(field.qid);
             window.speechSynthesis.cancel();
 
             await speak(field.text[language], language);
@@ -70,7 +74,7 @@ export default function SurveyPage() {
                     }
                 }
             }
-        } catch (error) {
+        } catch {
             setErrors("Unable to play audio. Please try again");
         }
     };
@@ -79,7 +83,6 @@ export default function SurveyPage() {
         if (loading || submitLoading) return;
 
         const allQuestions = questionSections.flatMap(section => section.questions);
-
         const response = allQuestions
             .filter((q) => shouldShowField(q, answers))
             .map((q) => {
@@ -95,6 +98,16 @@ export default function SurveyPage() {
             return;
         }
 
+        const paraInfo = {
+            deviceInfo: {
+                os: getOS()
+            },
+            interviewInfo: {
+                interviewMode: "browser",
+                interviewStartTime: localStorage.getItem(START_TIME),
+            },
+        }
+
         setErrors("");
         setSubmitLoading(true);
 
@@ -102,7 +115,7 @@ export default function SurveyPage() {
             const res = await fetch(`${BASE_URL}/response/${surveyId}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ response }),
+                body: JSON.stringify({ response, paraInfo }),
             });
 
             if (!res.ok) {
@@ -129,13 +142,13 @@ export default function SurveyPage() {
     /* ---------- CONSENT SCREEN ---------- */
     if (consent === null) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-                <div className="max-w-md w-full bg-white rounded-xl shadow p-6 space-y-4">
-                    <h1 className="text-xl font-semibold text-gray-800">
+            <div className="min-h-screen flex items-center justify-center bg-bg px-4">
+                <div className="max-w-md w-full bg-surface border border-border rounded-xl shadow-md p-6 space-y-5">
+                    <h1 className="text-xl font-semibold text-text-primary">
                         Consent Required
                     </h1>
 
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-text-muted leading-relaxed">
                         By continuing, you agree to participate in this survey and allow
                         your responses to be used for research purposes.
                     </p>
@@ -143,13 +156,13 @@ export default function SurveyPage() {
                     <div className="flex gap-3">
                         <button
                             onClick={() => handleConsent(true)}
-                            className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition"
+                            className="flex-1 bg-text-primary text-bg font-medium py-2 rounded-lg hover:bg-text-secondary transition-colors"
                         >
                             I Agree
                         </button>
                         <button
                             onClick={() => handleConsent(false)}
-                            className="flex-1 border py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition"
+                            className="flex-1 border border-border bg-transparent text-text-muted font-medium py-2 rounded-lg hover:bg-surface-alt hover:text-text-primary transition-colors"
                         >
                             Decline
                         </button>
@@ -161,7 +174,7 @@ export default function SurveyPage() {
 
     if (consent === false) {
         return (
-            <div className="min-h-screen flex items-center justify-center text-gray-600">
+            <div className="min-h-screen flex items-center justify-center bg-bg text-text-muted">
                 Consent not provided.
             </div>
         );
@@ -169,16 +182,16 @@ export default function SurveyPage() {
 
     /* ---------- SURVEY UI ---------- */
     return (
-        <div className="bg-gray-50 min-h-screen">
+        <div className="flex flex-col flex-1 min-w-0 bg-bg min-h-screen">
             {/* Header */}
-            <header className="sticky top-0 z-20 bg-white border-b">
+            <header className="sticky top-0 z-20 bg-bg/80 backdrop-blur-md border-b border-border">
                 <div className="max-w-3xl mx-auto px-6 py-4 flex justify-between items-center">
-                    <h1 className="font-semibold text-gray-800">Survey Form</h1>
+                    <h1 className="text-[15px] font-semibold text-text-primary tracking-tight">Survey Form</h1>
 
                     <select
                         value={language}
                         onChange={(e) => setLanguage(e.target.value)}
-                        className="border rounded-md px-3 py-1.5 text-sm"
+                        className="bg-surface border border-border text-text-primary rounded-md px-3 py-1.5 text-sm outline-none focus:border-geist-blue transition-colors"
                     >
                         {supportedLanguages.map((l) => (
                             <option key={l} value={l}>
@@ -189,9 +202,9 @@ export default function SurveyPage() {
                 </div>
             </header>
 
-            <main className="max-w-3xl mx-auto p-6 space-y-8">
+            <main className="max-w-3xl w-full mx-auto p-6 space-y-8">
                 {errors && (
-                    <div className="flex items-start gap-2 border border-red-200 bg-red-50 px-4 py-3 rounded-lg text-sm text-red-600">
+                    <div className="flex items-start gap-2 border border-geist-error/20 bg-geist-error/10 px-4 py-3 rounded-md text-sm text-geist-error">
                         <span>⚠️</span>
                         <span>{errors}</span>
                     </div>
@@ -210,11 +223,11 @@ export default function SurveyPage() {
                             <div key={index} className="space-y-6">
 
                                 {/* Section Header */}
-                                <div className="sticky top-[72px] z-10 bg-gray-50 py-2">
-                                    <h2 className="text-lg font-semibold text-gray-800">
+                                <div className="sticky top-[72px] z-10 bg-bg py-2">
+                                    <h2 className="text-sm font-semibold text-text-primary tracking-tight uppercase letter-spacing-[0.05em]">
                                         {section.sectionName}
                                     </h2>
-                                    <div className="h-[2px] bg-gray-200 mt-2" />
+                                    <div className="h-[1px] bg-border mt-3" />
                                 </div>
 
                                 {section.questions.map((field) => {
@@ -223,7 +236,7 @@ export default function SurveyPage() {
                                     return (
                                         <div
                                             key={field.qid}
-                                            className="bg-white rounded-xl shadow p-5 space-y-3"
+                                            className="bg-surface border border-border rounded-xl shadow-sm p-6 space-y-5 transition-colors"
                                         >
                                             <DynamicField
                                                 field={field}
@@ -232,11 +245,11 @@ export default function SurveyPage() {
                                                 onChange={handleChange}
                                             />
 
-                                            <div className="flex justify-end">
+                                            <div className="flex justify-end pt-2">
                                                 <button
                                                     type="button"
                                                     onClick={() => handleSpeakQuestion(field)}
-                                                    className="text-sm px-3 py-1 rounded-md border hover:bg-gray-100 transition"
+                                                    className="inline-flex items-center justify-center gap-2 px-3 h-8 text-[13px] font-medium rounded-md bg-transparent border border-border text-text-muted hover:text-text-primary hover:bg-surface-alt transition-colors"
                                                 >
                                                     🔊 Read
                                                 </button>
@@ -250,12 +263,12 @@ export default function SurveyPage() {
                 </section>
 
                 {/* Submit */}
-                <div className="flex justify-end">
+                <div className="flex justify-end pt-6 pb-12 border-t border-border mt-8">
                     <button
                         onClick={handleSubmit}
                         disabled={submitLoading || loading}
-                        className={`px-6 py-3 rounded-lg text-white font-medium transition
-                            ${submitLoading ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"}
+                        className={`inline-flex items-center justify-center px-6 h-10 text-[14px] font-medium rounded-md transition-colors
+                            ${submitLoading || loading ? "bg-border text-text-muted cursor-not-allowed" : "bg-text-primary text-bg hover:bg-text-secondary"}
                         `}
                     >
                         {submitLoading ? "Submitting..." : "Submit Survey"}

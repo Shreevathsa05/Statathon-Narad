@@ -1,7 +1,5 @@
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import NaradIllustration from "../components/survey/NaradIllustration";
-import SurveyCard from "../components/survey/SurveyCard";
 import { BASE_URL } from "../constants";
 
 export default function Home() {
@@ -31,104 +29,86 @@ export default function Home() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-3">
-                <div className="w-4 h-4 border border-[#2E2E2E] border-t-[#52A8FF] rounded-full animate-spin" />
-                <span className="text-xs text-[#525252] font-mono">
-                    Loading surveys…
-                </span>
+            <div className="flex flex-col flex-1 min-w-0 bg-bg min-h-screen">
+                <div className="flex flex-col p-6 w-full max-w-[1200px] mx-auto mt-4">
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4 mt-8">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <div key={i} className="bg-bg border border-border rounded-md shadow-sm p-4 flex flex-col gap-4 h-[120px] animate-pulse">
+                                <div className="flex justify-between items-start gap-3">
+                                    <div className="flex flex-col gap-2 w-full">
+                                        <div className="h-4 bg-border/40 rounded w-3/4"></div>
+                                        <div className="h-4 bg-border/40 rounded w-1/2"></div>
+                                    </div>
+                                    <div className="h-5 w-16 bg-border/20 rounded-full shrink-0"></div>
+                                </div>
+                                <div className="mt-auto flex justify-between items-center">
+                                    <div className="h-3 bg-border/20 rounded w-1/3"></div>
+                                    <div className="h-3 bg-border/20 rounded w-1/4"></div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
             </div>
         );
     }
 
     return (
-        <main className="min-h-screen bg-black text-[#EDEDED]" style={{ fontFamily: "'Geist', system-ui, sans-serif" }}>
-
-            {/* ── Hero ── */}
-            <section className="border-b border-[#2E2E2E]">
-                <div className="max-w-6xl mx-auto px-6 py-14 grid lg:grid-cols-2 gap-12 items-center">
-
+        <div className="flex flex-col flex-1 min-w-0 bg-bg min-h-screen">
+            <div className="flex flex-col p-6 w-full max-w-[1200px] mx-auto mt-4">
+                {/* Page Header */}
+                <div className="flex items-center justify-between pb-6 mb-6 border-b border-border">
                     <div>
-                        <p className="text-xs uppercase tracking-[0.12em] text-[#525252] mb-5 font-mono">
-                            Socio-economic survey platform
-                        </p>
+                        <h1 className="text-2xl font-bold tracking-tight text-text-primary mb-1">Citizen Portal</h1>
+                        <p className="text-sm text-text-muted">Participate in active surveys and contribute to data-driven decisions.</p>
+                    </div>
+                </div>
 
-                        <h1 className="text-5xl font-bold leading-[1.15] tracking-[-0.04em] text-[#EDEDED] mb-5">
-                            Empowering{" "}
-                            <span className="text-[#52A8FF]">data-driven</span>{" "}
-                            decisions
-                        </h1>
-
-                        <p className="text-[#A1A1A1] text-sm leading-relaxed max-w-md mb-7">
-                            Manage, track, and analyze surveys with real-time visibility and control.
-                        </p>
-
-                        <div className="flex gap-2 flex-wrap">
-                            {["Accurate", "Transparent", "Efficient"].map(tag => (
-                                <span
-                                    key={tag}
-                                    className="text-xs px-3 py-1 bg-[#0A0A0A] border border-[#2E2E2E] rounded text-[#A1A1A1]"
-                                >
-                                    {tag}
-                                </span>
-                            ))}
+                {/* Content */}
+                {errors && (
+                    <div className="flex items-start px-4 py-3 rounded-md text-sm border border-geist-error/20 bg-geist-error/10 text-geist-error mb-4">
+                        <div className="flex flex-col">
+                            <span className="font-semibold">Error</span>
+                            {errors}
                         </div>
                     </div>
+                )}
 
-                </div>
-            </section>
-
-            {/* ── Section Header ── */}
-            <section className="max-w-6xl mx-auto px-6 py-12">
-
-                <div className="mb-6">
-                    <h2 className="text-base font-semibold text-[#EDEDED] tracking-[-0.01em]">
-                        Active Surveys
-                    </h2>
-                    <p className="text-[#525252] text-xs mt-1">
-                        Currently running and high-priority surveys
-                    </p>
-                </div>
-
-                {activeSurveys.length === 0 ? (
-                    <div className="border border-[#2E2E2E] rounded-md p-12 text-center text-[#525252] text-sm bg-[#0A0A0A]">
-                        No active surveys
+                {activeSurveys.length === 0 && !errors ? (
+                    <div className="flex flex-col items-center justify-center p-12 text-center bg-surface border border-dashed border-border rounded-md text-text-muted">
+                        <h3 className="text-base font-medium text-text-primary mb-1">No active surveys found</h3>
+                        <p className="text-sm">Check back later for new surveys.</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
-
-                        {activeSurveys.map((survey) => (
-                            <div
-                                key={survey._id}
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">
+                        {activeSurveys.map(survey => (
+                            <div 
+                                key={survey._id || survey.surveyId} 
+                                className="bg-bg border border-border rounded-md shadow-sm p-4 flex flex-col gap-4 cursor-pointer hover:border-black hover:shadow-md transition-all h-full" 
                                 onClick={() => navigate(`/survey/${survey.surveyId}`)}
-                                className="p-4 border border-[#2E2E2E] rounded-md bg-[#0A0A0A] hover:border-[rgba(255,255,255,0.145)] transition-colors duration-150 cursor-pointer"
                             >
-                                {/* Top */}
-                                <div className="flex justify-between items-center mb-3">
-                                    <span className="text-xs text-[#525252] font-mono tracking-tight">
-                                        {survey.surveyId}
-                                    </span>
-
-                                    <span className="text-xs px-2 py-0.5 rounded border border-[#50E3C2]/20 bg-[#50E3C2]/5 text-[#50E3C2]">
+                                <div className="flex justify-between items-start gap-3">
+                                    <h3 className="text-base font-medium text-text-primary m-0 leading-tight line-clamp-2 overflow-hidden">
+                                        {survey.name || 'Untitled Survey'}
+                                    </h3>
+                                    <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-medium rounded-full border uppercase tracking-wider shrink-0 bg-geist-blue/10 text-geist-blue border-geist-blue/20`}>
                                         {survey.status}
                                     </span>
                                 </div>
 
-                                {/* Title */}
-                                <h3 className="text-sm font-medium text-[#EDEDED] mb-2 tracking-[-0.01em]">
-                                    {survey.name}
-                                </h3>
-
-                                {/* Date */}
-                                <p className="text-xs text-[#525252] font-mono">
-                                    {new Date(survey.createdAt).toLocaleDateString()}
-                                </p>
+                                <div className="mt-auto pt-4 flex flex-col gap-2">
+                                    <div className="flex items-center justify-between text-[13px] text-text-muted">
+                                        <span>{new Date(survey.createdAt).toLocaleDateString()}</span>
+                                        <span className="font-mono text-[12px]">
+                                            #{survey.surveyId?.substring(0, 8)}
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
                         ))}
-
                     </div>
                 )}
-
-            </section>
-        </main>
+            </div>
+        </div>
     );
 }

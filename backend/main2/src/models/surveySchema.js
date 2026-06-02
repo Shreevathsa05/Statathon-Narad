@@ -69,10 +69,9 @@ const QuestionSchema = new mongoose.Schema(
 		audio: {
 			type: Map,
 			of: {
-				type: String,
-				minlength: 1,
+				type: String
 			},
-			required: true,
+			required: false,
 		},
 
 		options: {
@@ -83,11 +82,11 @@ const QuestionSchema = new mongoose.Schema(
 			validate: {
 				validator: function (v) {
 					if (this.type === "mcq" || this.type === "checkbox") {
-						return Array.isArray(v) && v.length >= 2 && v.length <= 5;
+						return Array.isArray(v) && v.length >= 2 && v.length <= 10;
 					}
 					return true;
 				},
-				message: "MCQ/Checkbox must have between 2 and 5 options",
+				message: "MCQ/Checkbox must have between 2 and 10 options",
 			},
 		},
 

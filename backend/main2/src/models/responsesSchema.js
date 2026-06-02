@@ -1,10 +1,5 @@
 import mongoose, { Schema } from "mongoose";
 
-// const requiredOnComplete = function () {
-// 	const doc = this.ownerDocument ? this.ownerDocument() : this;
-// 	return doc.status === "completed";
-// };
-
 const ParaInfoSchema = new mongoose.Schema(
 	{
 		deviceInfo: {
@@ -12,11 +7,6 @@ const ParaInfoSchema = new mongoose.Schema(
 				type: String,
 				default: "unknown",
 			},
-		},
-		status: {
-			type: String,
-			enum: ["in_progress", "completed"],
-			default: "in_progress"
 		},
 		interviewInfo: {
 			interviewMode: {
@@ -41,19 +31,19 @@ const ParaInfoSchema = new mongoose.Schema(
 			},
 			state: {
 				type: String,
-				required: true
+				// required: true
 			},
 			district: {
 				type: String,
-				required: true
+				// required: true
 			},
 			subDistrict: {
 				type: String,
-				required: true
+				// required: true
 			},
 			blockName: {
 				type: String,
-				required: true
+				// required: true
 			},
 			census_2011: {
 				type: String,
