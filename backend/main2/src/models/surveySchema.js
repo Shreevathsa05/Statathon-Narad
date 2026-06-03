@@ -15,6 +15,12 @@ const LANGUAGES = [
 	"urdu",
 ];
 
+const CHANNELS = [
+	"web",
+	"ivr",
+	"whatsapp",
+];
+
 const ShowIfSchema = new mongoose.Schema(
 	{
 		questionId: {
@@ -147,6 +153,11 @@ const SurveySchema = new mongoose.Schema(
 			],
 			required: true,
 		},
+		accessType: {
+			type: String,
+			enum: ["general", "targeted"],
+			required: true,
+		},
 		supportedLanguages: {
 			type: [String],
 			enum: LANGUAGES,
@@ -159,12 +170,22 @@ const SurveySchema = new mongoose.Schema(
 				message: "supportedLanguages must be a unique non-empty array",
 			},
 		},
-
 		questionSections: {
 			type: [questionSectionSchema],
 			required: true,
 		},
-
+		allowedChannels: {
+			type: [String],
+			enum: CHANNELS,
+			required: true,
+			validate: {
+				validator: (channels) =>
+					Array.isArray(channels) &&
+					channels.length > 0 &&
+					new Set(channels).size === channels.length,
+				message: "allowedChannels must be a unique non-empty array",
+			},
+		},
 		categories: {
 			type: [String],
 			required: true,
