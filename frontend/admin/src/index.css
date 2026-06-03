@@ -173,10 +173,10 @@
   animation: blob-wave 4s linear infinite;
   
   /* Brightness based on voice */
-  opacity: calc(0.35 + var(--audio-intensity, 0) * 0.65);
+  opacity: calc(0.45 + var(--audio-intensity, 0) * 0.75);
   
   /* Blur expands uniformly outward based on voice, without distorting aspect ratio */
-  filter: blur(calc(12px + var(--audio-intensity, 0) * 18px));
+  filter: blur(calc(12px + var(--audio-intensity, 0) * 22px));
   
   transition: opacity 0.05s ease, filter 0.05s ease;
 }

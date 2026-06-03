@@ -5,6 +5,10 @@ import "dotenv/config"
 
 const connectDB = async () => {
     try {
+        if (mongoose.connection.readyState >= 1) {
+            return mongoose.connection;
+        }
+
         const DB_NAME = process.env.DB_NAME + "?ssl=true&replicaSet=atlas-d4v24w-shard-0&authSource=admin&appName=narad";
         const mongoURI = `${process.env.MONGODB_URI}/${DB_NAME}`;
         console.log(mongoURI);

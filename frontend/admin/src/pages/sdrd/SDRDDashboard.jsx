@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { surveyClient } from '../../api/survey';
 import { aiClient } from '../../api/aiClient';
@@ -103,6 +104,7 @@ function SurveyCard({ survey, onClick, index = 0 }) {
   const audioMap = localSurvey.questionSections?.[0]?.questions?.[0]?.audio;
   const hasAudio = audioMap && Object.values(audioMap).some(val => val && val.trim() !== "");
   const isProcessing = localSurvey.status === 'translating' || localSurvey.status === 'generating_audio';
+  const [tooltipState, setTooltipState] = useState({ show: false, x: 0, y: 0 });
 
   const questionCount = localSurvey.questionSections?.reduce((acc, section) => acc + (section.questions?.length || 0), 0) || 0;
   const sectionCount = localSurvey.questionSections?.length || 0;
@@ -147,7 +149,14 @@ function SurveyCard({ survey, onClick, index = 0 }) {
       <div className="mt-auto pt-4 flex flex-col gap-2">
         <div className="flex items-center justify-between text-[13px] text-text-muted">
           <span>{sectionCount} Sections • {questionCount} Questions</span>
-          <span className="font-mono text-[12px]">
+          <span 
+            className="font-mono text-[12px] cursor-help"
+            onMouseMove={(e) => {
+              e.stopPropagation();
+              setTooltipState({ show: true, x: e.clientX, y: e.clientY });
+            }}
+            onMouseLeave={() => setTooltipState({ show: false, x: 0, y: 0 })}
+          >
             #{localSurvey.surveyId?.substring(0, 8)}
           </span>
         </div>
@@ -193,6 +202,16 @@ function SurveyCard({ survey, onClick, index = 0 }) {
           )}
         </div>
       </div>
+
+      {tooltipState.show && createPortal(
+        <div 
+          className="fixed z-50 bg-neutral-900 text-white text-xs px-2 py-1 rounded shadow-lg pointer-events-none whitespace-nowrap animate-in fade-in zoom-in duration-150"
+          style={{ top: tooltipState.y + 15, left: tooltipState.x + 10 }}
+        >
+          {localSurvey.surveyId}
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

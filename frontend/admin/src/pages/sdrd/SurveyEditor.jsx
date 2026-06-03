@@ -596,8 +596,8 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
 
   return (
     <div className="flex flex-col flex-1 min-w-0 bg-bg">
-      {/* Sticky Header */}
-      <div className="bg-bg sticky top-0 z-10 border-b border-border">
+      {/* Sticky Header for Back Button */}
+      <div className="bg-bg border-b border-border">
         {/* Full-width container for the back button */}
         <div className="w-full px-8 pt-6 pb-2">
           <button 
@@ -607,9 +607,12 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
             <ArrowLeft size={16} /> Back to Dashboard
           </button>
         </div>
+      </div>
         
+      {/* Top Bar with Title and Actions */}
+      <div className="w-full bg-surface border-b border-border pt-6 pb-6 sticky top-0 z-[40]">
         {/* Constrained container for Title and Actions */}
-        <div className="w-full max-w-[1200px] mx-auto px-6 pb-6 flex flex-col lg:flex-row lg:items-start justify-between gap-6">
+        <div className="w-full max-w-[1200px] mx-auto px-6 flex flex-col lg:flex-row lg:items-start justify-between gap-6">
           <div className="flex-1 min-w-0">
             {isEditingTitle ? (
             <div className="flex items-center gap-3 mb-2 w-full max-w-[800px]">
