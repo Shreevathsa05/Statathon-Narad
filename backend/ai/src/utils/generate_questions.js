@@ -75,7 +75,7 @@ export async function generate_english_questions(user_input, surveyId) {
                 audio: { english: "" },
                 options: [
                     { id: "aadhaar", label: { english: "Aadhaar" } },
-                    { id: "pan", label: { english: "PAN" } },
+                    { id: "phone", label: { english: "Phone" } },
                 ]
             },
             {
@@ -98,10 +98,15 @@ export async function generate_english_questions(user_input, surveyId) {
             }
         ]
     };
-    
+
     questionSections.push(demographicsSection);
-    
-    let allGeneratedQuestions = [...demographicsSection.questions];
+
+    let allGeneratedQuestions = [
+        {
+            sectionName: demographicsSection.sectionName,
+            questions: demographicsSection.questions.map(q => ({ qid: q.qid }))
+        }
+    ];
 
     for (const section of sectionsPlan) {
         pushLog(id, `Generating questions for section: ${section.sectionName}`);
@@ -113,7 +118,10 @@ export async function generate_english_questions(user_input, surveyId) {
             questionsForSection = [];
         }
 
-        allGeneratedQuestions = allGeneratedQuestions.concat(questionsForSection);
+        allGeneratedQuestions.push({
+            sectionName: section.sectionName || "General",
+            questions: questionsForSection.map(q => ({ qid: q.qid }))
+        });
 
         questionSections.push({
             sectionName: section.sectionName || "General",
