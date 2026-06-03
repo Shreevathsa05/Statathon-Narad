@@ -3,6 +3,8 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { Demographics } from "../models/demographics.js";
 
+import { hashAadhaar } from "../utils/hash.js";
+
 export const createDemographic = asyncHandler(async (req, res) => {
     const {
         aadhaarNo,
@@ -31,8 +33,10 @@ export const createDemographic = asyncHandler(async (req, res) => {
     const cleanAadhaar = aadhaarNo.replace(/\D/g, "");
     const cleanPhone = phone.replace(/\D/g, "");
 
+    const userKey = hashAadhaar(cleanAadhaar);
+
     const demographic = await Demographics.create({
-        aadhaarNo: cleanAadhaar,
+        aadhaarNo: userKey,
         phone: cleanPhone,
         fullName,
         age,
@@ -54,13 +58,14 @@ export const getDemographic = asyncHandler(async (req, res) => {
         throw new ApiError(400, "uidType and val are required");
     }
 
-    const cleanVal = val.replace(/\D/g, "");
-
     let query;
 
     if (uidType === "aadhaar") {
-        query = { aadhaarNo: cleanVal };
+        const cleanVal = val.replace(/\D/g, "");
+        const userKey = hashAadhaar(cleanVal);
+        query = { userKey };
     } else if (uidType === "phone") {
+        const cleanVal = val.replace(/\D/g, "");
         query = { phone: cleanVal };
     } else {
         throw new ApiError(400, "Invalid uidType");

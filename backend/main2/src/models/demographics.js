@@ -6,7 +6,6 @@ const DemographicSchema = new mongoose.Schema(
             type: String,
             trim: true,
             unique: true,
-            match: /^[0-9]{12}$/,
             required: true,
         },
 
