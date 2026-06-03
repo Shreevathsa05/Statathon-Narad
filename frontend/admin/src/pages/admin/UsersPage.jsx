@@ -3,11 +3,13 @@ import client from '../../api/client.js';
 import TopBar from '../../components/TopBar.jsx';
 import UserTable from '../../components/UserTable.jsx';
 import InviteUserModal from '../../components/InviteUserModal.jsx';
+import { useToast } from '../../context/ToastContext.jsx';
 
 export default function UsersPage() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showInvite, setShowInvite] = useState(false);
+  const toast = useToast();
 
   const fetchUsers = async () => {
     try {
@@ -25,15 +27,17 @@ export default function UsersPage() {
   const handleSuspend = async (id) => {
     try {
       await client.patch(`/users/${id}/suspend`);
+      toast.success('User suspension status updated');
       fetchUsers();
-    } catch (err) { alert(err.message || 'Failed to suspend'); }
+    } catch (err) { toast.error(err.message || 'Failed to update suspension status'); }
   };
 
   const handleDelete = async (id) => {
     try {
       await client.delete(`/users/${id}`);
+      toast.success('User deleted successfully');
       fetchUsers();
-    } catch (err) { alert(err.message || 'Failed to delete'); }
+    } catch (err) { toast.error(err.message || 'Failed to delete'); }
   };
 
   return (

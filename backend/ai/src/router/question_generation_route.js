@@ -70,7 +70,7 @@ question_generation_router.post('/generate_questions_english', async (req, res) 
     }
 
     // Fire and forget - do not await
-    generate_english_questions_retry(final_query, surveyId)
+    generate_english_questions_retry(final_query, surveyId, survey_name)
         .then(() => console.log(`Generation finished for ${surveyId}`))
         .catch(err => console.error(`Generation failed for ${surveyId}:`, err));
 

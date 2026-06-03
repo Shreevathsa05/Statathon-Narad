@@ -12,7 +12,7 @@ function pushLog(id, msg) {
     surveyLogs.get(id).push(msg);
 }
 
-export async function generate_english_questions(user_input, surveyId) {
+export async function generate_english_questions(user_input, surveyId, survey_name) {
     // 1. Ensure DB connection
     await connectDB();
 
@@ -75,7 +75,7 @@ export async function generate_english_questions(user_input, surveyId) {
                 audio: { english: "" },
                 options: [
                     { id: "aadhaar", label: { english: "Aadhaar" } },
-                    { id: "phone", label: { english: "Phone" } },
+                    { id: "phone_no", label: { english: "Phone no." } },
                 ]
             },
             {
@@ -148,7 +148,7 @@ export async function generate_english_questions(user_input, surveyId) {
     // 6. Merge into Final JSON and Save to MongoDB
     const surveyData = {
         surveyId: id,
-        name: `Survey on ${user_input}`.substring(0, 100),
+        name: survey_name || `Survey on ${user_input}`.substring(0, 100),
         status: "pending",
         supportedLanguages: ["english"],
         questionSections: questionSections,
@@ -169,11 +169,11 @@ export async function generate_english_questions(user_input, surveyId) {
     return savedSurvey;
 }
 
-export default async function generate_english_questions_retry(user_input, id) {
+export default async function generate_english_questions_retry(user_input, id, survey_name) {
     for (let i = 0; i < 3; i++) {
         try {
             console.log(`Attempt ${i + 1} for query: ${user_input}`);
-            const survey = await generate_english_questions(user_input, id);
+            const survey = await generate_english_questions(user_input, id, survey_name);
             if (survey) {
                 return survey;
             }

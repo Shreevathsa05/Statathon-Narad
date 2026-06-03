@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import client from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Loader2 } from 'lucide-react';
+import { useToast } from '../context/ToastContext.jsx';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -13,6 +14,7 @@ export default function LoginPage() {
   
   const { login } = useAuth();
   const navigate = useNavigate();
+  const toast = useToast();
 
   const handleCheckEmail = async (e) => {
     e.preventDefault();
@@ -42,6 +44,7 @@ export default function LoginPage() {
     setError('');
     try {
       const user = await login(email, password);
+      toast.success(`Logged in as ${user.role}`);
       navigate('/dashboard');
     } catch (err) {
       setError(err.message || 'Invalid credentials');
