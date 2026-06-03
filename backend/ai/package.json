@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "dev": "node --watch index.js",
+    "dev": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -23,6 +23,7 @@
     "groq-sdk": "^1.1.1",
     "langchain": "^1.4.2",
     "langsmith": "^0.7.3",
+    "minio": "^8.0.7",
     "mongoose": "^9.6.3",
     "redis": "^5.11.0",
     "sarvamai": "^1.1.6",

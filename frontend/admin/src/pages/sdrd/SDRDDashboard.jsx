@@ -1,24 +1,132 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { surveyClient } from '../../api/survey';
-import { Plus, Sparkles, Clock, Globe } from 'lucide-react';
+import { aiClient } from '../../api/aiClient';
+import { useToast } from '../../context/ToastContext.jsx';
+import { Plus, Sparkles, Clock, Globe, Volume2, AudioLines } from 'lucide-react';
 import TopBar from '../../components/TopBar.jsx';
 
+const SpinningGlobe = ({ size = 12, className = "" }) => (
+  <svg 
+    xmlns="http://www.w3.org/2000/svg" 
+    width={size} 
+    height={size} 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="1.25" 
+    strokeLinecap="round" 
+    strokeLinejoin="round" 
+    className={className}
+  >
+    <circle cx="12" cy="12" r="10" />
+    <path d="M2 12h20" />
+    
+    <path fill="none">
+      <animate attributeName="d" values="M 12 2 Q -8 12 12 22; M 12 2 Q 12 12 12 22; M 12 2 Q 32 12 12 22" dur="2s" repeatCount="indefinite" begin="0s" />
+      <animate attributeName="opacity" values="0; 1; 1; 0" keyTimes="0; 0.2; 0.8; 1" dur="2s" repeatCount="indefinite" begin="0s" />
+    </path>
+    <path fill="none">
+      <animate attributeName="d" values="M 12 2 Q -8 12 12 22; M 12 2 Q 12 12 12 22; M 12 2 Q 32 12 12 22" dur="2s" repeatCount="indefinite" begin="-0.5s" />
+      <animate attributeName="opacity" values="0; 1; 1; 0" keyTimes="0; 0.2; 0.8; 1" dur="2s" repeatCount="indefinite" begin="-0.5s" />
+    </path>
+    <path fill="none">
+      <animate attributeName="d" values="M 12 2 Q -8 12 12 22; M 12 2 Q 12 12 12 22; M 12 2 Q 32 12 12 22" dur="2s" repeatCount="indefinite" begin="-1s" />
+      <animate attributeName="opacity" values="0; 1; 1; 0" keyTimes="0; 0.2; 0.8; 1" dur="2s" repeatCount="indefinite" begin="-1s" />
+    </path>
+    <path fill="none">
+      <animate attributeName="d" values="M 12 2 Q -8 12 12 22; M 12 2 Q 12 12 12 22; M 12 2 Q 32 12 12 22" dur="2s" repeatCount="indefinite" begin="-1.5s" />
+      <animate attributeName="opacity" values="0; 1; 1; 0" keyTimes="0; 0.2; 0.8; 1" dur="2s" repeatCount="indefinite" begin="-1.5s" />
+    </path>
+  </svg>
+);
+
 function SurveyCard({ survey, onClick, index = 0 }) {
-  const questionCount = survey.questionSections?.reduce((acc, section) => acc + (section.questions?.length || 0), 0) || 0;
-  const sectionCount = survey.questionSections?.length || 0;
-  const languages = survey.supportedLanguages?.join(', ') || 'English';
+  const [localSurvey, setLocalSurvey] = useState(survey);
+  const [translateLogs, setTranslateLogs] = useState([]);
+  const toast = useToast();
+
+  useEffect(() => {
+    let interval;
+    const isProcessing = localSurvey.status === 'translating' || localSurvey.status === 'generating_audio';
+    
+    if (isProcessing) {
+      interval = setInterval(async () => {
+        try {
+          const res = await aiClient.pollQuestionsMultilang(localSurvey.surveyId);
+          if (res.logs) {
+            let filteredLogs = [];
+            let isInsideRawBlock = false;
+            let agentStartedSeen = false;
+            for (const log of res.logs) {
+              if (log.includes('=== RAW MULTILANG TRANSLATOR RESPONSE ===')) {
+                isInsideRawBlock = true;
+                continue;
+              }
+              if (isInsideRawBlock && log.includes('=========================================')) {
+                isInsideRawBlock = false;
+                continue;
+              }
+              if (!isInsideRawBlock) {
+                if (log.startsWith('Multilang Translator Agent Started') || log.startsWith('Audio Generation Agent Started')) {
+                  if (!agentStartedSeen) {
+                    agentStartedSeen = true;
+                    filteredLogs.push(log);
+                  }
+                } else if (log.startsWith('Multilang Translator Agent Completed') || log.startsWith('Audio Generation Agent Completed')) {
+                  continue; // Skip all 'Completed' messages as they are just noise
+                } else {
+                  filteredLogs.push(log);
+                }
+              }
+            }
+            setTranslateLogs(filteredLogs);
+          }
+          if (res.status !== 'translating' && res.status !== 'generating_audio') {
+            clearInterval(interval);
+            setLocalSurvey(prev => ({ ...prev, ...(res.data || {}), status: res.status }));
+            setTranslateLogs([]);
+            if (localSurvey.status === 'translating') {
+                toast.success('Translation completed successfully!');
+            } else if (localSurvey.status === 'generating_audio') {
+                toast.success('Audio generation completed successfully!');
+            }
+          }
+        } catch (err) {
+          console.error("Polling error", err);
+        }
+      }, 3000);
+    }
+    return () => clearInterval(interval);
+  }, [localSurvey.status, localSurvey.surveyId]);
+
+  const audioMap = localSurvey.questionSections?.[0]?.questions?.[0]?.audio;
+  const hasAudio = audioMap && Object.values(audioMap).some(val => val && val.trim() !== "");
+  const isProcessing = localSurvey.status === 'translating' || localSurvey.status === 'generating_audio';
+
+  const questionCount = localSurvey.questionSections?.reduce((acc, section) => acc + (section.questions?.length || 0), 0) || 0;
+  const sectionCount = localSurvey.questionSections?.length || 0;
+  const languages = localSurvey.supportedLanguages?.join(', ') || 'English';
   
   // Clean up repetitive titles from AI generation
-  let displayName = survey.name || 'Untitled Survey';
+  let displayName = localSurvey.name || 'Untitled Survey';
   if (displayName.startsWith("Survey on Survey on")) {
       displayName = displayName.replace("Survey on Survey on", "Survey on");
   }
 
+  const handleClick = (e) => {
+    if (isProcessing) {
+      e.preventDefault();
+      e.stopPropagation();
+      toast.info(localSurvey.status === 'translating' ? "Hold on we are translating this survey for you" : "Hold on we are generating audio for this survey");
+    } else {
+      onClick();
+    }
+  };
+
   return (
-    <div 
-      className="bg-bg border border-border rounded-md shadow-sm p-4 flex flex-col gap-4 cursor-pointer hover:border-black hover:shadow-md transition-all h-full opacity-0 animate-fade-in-card" 
-      onClick={onClick}
+      <div className={`bg-bg border border-border rounded-md shadow-sm p-4 flex flex-col gap-4 transition-all h-full opacity-0 animate-fade-in-card ${isProcessing ? 'cursor-not-allowed opacity-80' : 'cursor-pointer hover:border-black hover:shadow-md'}`} 
+      onClick={handleClick}
       style={{ animationDelay: `${index * 50}ms` }}
     >
       <div className="flex justify-between items-start gap-3">
@@ -26,11 +134,13 @@ function SurveyCard({ survey, onClick, index = 0 }) {
           {displayName}
         </h3>
         <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-medium rounded-full border uppercase tracking-wider shrink-0 ${
-              survey.status === 'active' ? 'bg-geist-blue/10 text-geist-blue border-geist-blue/20' : 
-              survey.status === 'pending' ? 'bg-amber-500/10 text-amber-700 border-amber-500/20' : 
+              localSurvey.status === 'active' ? 'bg-geist-blue/10 text-geist-blue border-geist-blue/20' : 
+              localSurvey.status === 'translating' ? 'bg-purple-500/10 text-purple-700 border-purple-500/20' :
+              localSurvey.status === 'generating_audio' ? 'bg-indigo-500/10 text-indigo-700 border-indigo-500/20' :
+              localSurvey.status === 'pending' ? 'bg-amber-500/10 text-amber-700 border-amber-500/20' : 
               'bg-geist-error/10 text-geist-error border-geist-error/20'
             }`}>
-          {survey.status}
+          {localSurvey.status === 'generating_audio' ? 'Generating Audio' : localSurvey.status}
         </span>
       </div>
 
@@ -38,14 +148,49 @@ function SurveyCard({ survey, onClick, index = 0 }) {
         <div className="flex items-center justify-between text-[13px] text-text-muted">
           <span>{sectionCount} Sections • {questionCount} Questions</span>
           <span className="font-mono text-[12px]">
-            #{survey.surveyId?.substring(0, 8)}
+            #{localSurvey.surveyId?.substring(0, 8)}
           </span>
         </div>
-        <div className="flex items-center gap-1.5 text-xs text-text-muted">
-          <Globe size={12} />
-          <span className="capitalize whitespace-nowrap overflow-hidden text-ellipsis">
-            {languages}
-          </span>
+        <div className="flex items-center gap-1.5 text-xs text-text-muted h-[18px]">
+          {isProcessing ? (
+            localSurvey.status === 'generating_audio' ? (
+              <AudioLines size={12} className="shrink-0 text-indigo-500 animate-pulse" />
+            ) : (
+              <SpinningGlobe size={12} className="shrink-0" />
+            )
+          ) : (
+            <div className="flex items-center gap-1.5 shrink-0">
+              <Globe size={12} />
+              {hasAudio && <Volume2 size={12} className="text-text-muted" />}
+            </div>
+          )}
+          {isProcessing ? (
+            <div className="relative overflow-hidden h-[18px] w-full">
+              <div 
+                className="absolute top-0 left-0 flex flex-col w-full transition-transform duration-700 ease-in-out"
+                style={{ transform: `translateY(-${Math.max(0, translateLogs.length - 1) * 18}px)` }}
+              >
+                {translateLogs.length === 0 ? (
+                  <span className={`h-[18px] flex items-center whitespace-nowrap overflow-hidden text-ellipsis font-mono text-[10px] ${localSurvey.status === 'generating_audio' ? 'text-indigo-600' : 'text-purple-600'}`}>
+                    {localSurvey.status === 'generating_audio' ? 'Initializing audio generation...' : 'Initializing translation...'}
+                  </span>
+                ) : (
+                  translateLogs.map((log, i) => (
+                    <span 
+                      key={i} 
+                      className={`h-[18px] flex items-center whitespace-nowrap overflow-hidden text-ellipsis font-mono text-[10px] ${localSurvey.status === 'generating_audio' ? 'text-indigo-600' : 'text-purple-600'} transition-opacity duration-700 ${i === translateLogs.length - 1 ? 'opacity-100' : 'opacity-40'}`}
+                    >
+                      {log}
+                    </span>
+                  ))
+                )}
+              </div>
+            </div>
+          ) : (
+            <span className="capitalize whitespace-nowrap overflow-hidden text-ellipsis">
+              {languages}
+            </span>
+          )}
         </div>
       </div>
     </div>

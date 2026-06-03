@@ -66,5 +66,13 @@ export const aiClient = {
       throw new Error(`Failed to poll translation: ${response.statusText}`);
     }
     return response.json();
+  },
+
+  async generateAudio(surveyId) {
+    const response = await fetch(`/speech/generate_audio/${surveyId}`);
+    if (!response.ok) {
+      throw new Error(`Failed to generate audio: ${response.statusText}`);
+    }
+    return response.json();
   }
 };

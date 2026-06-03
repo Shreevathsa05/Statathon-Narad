@@ -14,6 +14,10 @@ export default defineConfig({
       '/question-generation': {
         target: 'http://localhost:3001',
         changeOrigin: true,
+      },
+      '/speech': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
       }
     }
   }

@@ -2,9 +2,16 @@ import { Survey } from "../mongodb/surveySchema.js";
 import connectDB from "../mongodb/connect.js";
 import { b64toMp3, generate_audio } from "./audio_helpers.js";
 import { uploadAudio } from "./minio/file_uploads.js";
+import { surveyLogs } from "../router/question_generation_route.js";
 
 export async function audio_generation(surveyId) {
-    console.log(`\n--- Starting Audio Generation for Survey: ${surveyId} ---`);
+    const log = (msg) => {
+        console.log(msg);
+        if (!surveyLogs.has(surveyId)) surveyLogs.set(surveyId, []);
+        surveyLogs.get(surveyId).push(msg);
+    };
+
+    log(`\n--- Starting Audio Generation for Survey: ${surveyId} ---`);
 
     let survey = await Survey.findOne({ surveyId: surveyId });
     if (!survey) {
@@ -13,7 +20,7 @@ export async function audio_generation(surveyId) {
     }
 
     const supported_languages = survey.supportedLanguages;
-    console.log(`Supported Languages: ${supported_languages.join(", ")}`);
+    log(`Audio Generation Agent Started for languages: ${supported_languages.join(", ")}`);
 
     let updatesMade = false;
 
@@ -23,7 +30,7 @@ export async function audio_generation(surveyId) {
         for (const question of section.questions) {
             for (const language of supported_languages) {
                 // temporary
-                if (language === 'malyalam') {
+                if (language === 'malayalam') {
                     continue;
                 }
 
@@ -34,7 +41,7 @@ export async function audio_generation(surveyId) {
                 const currentAudio = question.audio.get(language);
 
                 if (currentAudio && currentAudio.trim() !== "") {
-                    console.log(`[Audio Task] QID: ${question.qid} | Lang: ${language} -> Audio already exists, skipping.`);
+                    log(`[Audio Task] QID: ${question.qid} | Lang: ${language} -> Audio already exists, skipping.`);
                     continue;
                 }
 
@@ -52,18 +59,28 @@ export async function audio_generation(surveyId) {
                     }
                 }
 
-                console.log(`\n[Audio Task] QID: ${question.qid} | Lang: ${language}`);
+                log(`[Audio Task] QID: ${question.qid} | Lang: ${language} -> Generating audio...`);
                 console.log(`[Script]: "${scriptText}"`);
 
-                // 2. Generate audio using external api
-                const audio_base64 = await generate_audio(scriptText, language);
-                const audioId = crypto.randomUUID();
-                const fileName = `${audioId}.mp3`;
-                await b64toMp3(audio_base64, "audio", fileName);
-                await uploadAudio(surveyId, fileName);
+                if (!scriptText || scriptText.trim() === "") {
+                    log(`[Audio Task] QID: ${question.qid} | Lang: ${language} -> Script is empty, skipping.`);
+                    continue;
+                }
 
-                question.audio.set(language, fileName);
-                updatesMade = true;
+                // 2. Generate audio using external api
+                try {
+                    const audio_base64 = await generate_audio(scriptText, language);
+                    const audioId = crypto.randomUUID();
+                    const fileName = `${audioId}.mp3`;
+                    await b64toMp3(audio_base64, "audio", fileName);
+                    await uploadAudio(surveyId, fileName);
+
+                    question.audio.set(language, fileName);
+                    updatesMade = true;
+                } catch (err) {
+                    log(`[Audio Task] QID: ${question.qid} | Lang: ${language} -> Generation failed: ${err.message}`);
+                    console.error(err);
+                }
             }
         }
     }
@@ -72,11 +89,17 @@ export async function audio_generation(surveyId) {
         console.log("\nSaving survey updates to MongoDB...");
         await Survey.updateOne(
             { surveyId: surveyId },
-            { $set: { questionSections: survey.questionSections } }
+            { 
+                $set: { 
+                    questionSections: survey.questionSections,
+                    status: "pending" 
+                } 
+            }
         );
-        console.log("Save complete.");
+        log("Audio Generation Agent Completed.");
     } else {
-        console.log("\nNo new audio needed to be generated.");
+        await Survey.updateOne({ surveyId: surveyId }, { $set: { status: "pending" } });
+        log("Audio Generation Agent Completed.");
     }
 }
 

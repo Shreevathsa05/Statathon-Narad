@@ -124,7 +124,7 @@ const SurveySchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ["pending", "approved", "active", "complete", "updating", "translating"],
+        enum: ["pending", "approved", "active", "complete", "updating", "translating", "generating_audio"],
         required: true,
     },
     supportedLanguages: {
