@@ -149,6 +149,7 @@ const SurveySchema = new mongoose.Schema(
 				"complete",
 				"updating",
 				"translating",
+				"generating_audio",
 			],
 			required: true,
 		},

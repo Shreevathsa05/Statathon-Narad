@@ -75,7 +75,8 @@ A survey moves through these states:
 pending ──► approved ──► active ──► complete
   │                          │
   ├──► updating (while AI is editing a section)
-  └──► translating (while AI is doing multilang translation)
+  ├──► translating (while AI is doing multilang translation)
+  └──► generating_audio (while AI is generating TTS audio)
 ```
 
 - **pending**: Created by AI, awaiting admin approval
@@ -84,6 +85,7 @@ pending ──► approved ──► active ──► complete
 - **complete**: Closed, no new responses
 - **updating**: Temporarily locked during AI section improvement
 - **translating**: Temporarily locked during multilingual translation
+- **generating_audio**: Temporarily locked during Text-To-Speech (TTS) audio generation
 
 > ⚠️ **Active and complete surveys cannot be edited.**
 
@@ -123,6 +125,7 @@ User Query
   └─► [3] Question Generator Agent — Generates questions per-section (prepends standard Demographics, uses previous questions for deduplication), grounded in MoSPI data, outputs strict JSON
   └─► [4] Improver Agent           — Edits a specific section based on natural-language instructions
   └─► [5] Multilingual Translator  — Translates all text/options into target regional languages
+  └─► [6] Audio Generation Agent   — Converts translated text/options into speech via Sarvam TTS and uploads to MinIO
 ```
 
 ### Key API Endpoints
@@ -134,6 +137,8 @@ User Query
 | `POST` | `/question-generation/improve_section_english` | Refine a specific section with free-text instructions |
 | `POST` | `/question-generation/generate_questions_multilang` | Translate a completed English survey to target languages |
 | `GET`  | `/question-generation/poll_questions_multilang/:surveyId` | Poll translation progress |
+| `GET`  | `/speech/generate_audio/:surveyId` | Kicks off background Sarvam TTS audio generation for all survey questions |
+| `GET`  | `/speech/audio/:surveyId/:audioId` | Proxy route that serves generated `.mp3` files directly from MinIO storage |
 | `POST` | `/speech/stt-twilio` | Whisper (Groq) STT on a Twilio recording URL |
 | `POST` | `/speech/stt-twilio-sarvam` | Sarvam AI STT for Indian-accented/regional speech |
 
@@ -144,7 +149,8 @@ User Query
 {
   surveyId: String (unique, UUID),
   name: String,
-  status: "pending" | "approved" | "active" | "complete" | "updating" | "translating",
+  status: "pending" | "approved" | "active" | "complete" | "updating" | "translating" | "generating_audio",
+  accessType: "general" | "targeted",
   supportedLanguages: [String],  // subset of LANGUAGES enum
   questionSections: [{
     sectionName: String,
@@ -162,6 +168,7 @@ User Query
     }]
   }],
   categories: [String],
+  allowedChannels: [String],     // subset of CHANNELS enum ("web", "ivr", "whatsapp")
   createdBy: String,
   timestamps: true
 }
@@ -194,6 +201,9 @@ User Query
 | Twilio | Fetch recorded audio from IVR calls | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` |
 | MongoDB | Survey + SurveyPlan storage | `MONGODB_URI` |
 | Redis | Background job state/caching | `REDIS_URL` |
+| MinIO | S3-compatible audio file storage | `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_ENDPOINT`, `MINIO_BUCKET_NAME` |
+| Tavily | Web search fallback for agents | `TAVILY_API_KEY`, `TAVILY_MCP_URI` |
+| LangSmith | Agent reasoning tracing and debugging | `LANGSMITH_TRACING`, `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT` |
 
 ---
 
@@ -204,64 +214,25 @@ The canonical REST API for survey CRUD and structured response collection. This 
 
 ### Key API Endpoints
 
-**Survey Routes** (`/api/survey`)
+**Survey & Response Routes** (`/api/survey`, `/api/response`)
+- Core CRUD operations for surveys and response ingestion. See `backend/main2/Readme.md` for full payload structures.
 
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/survey/` | Create a new survey |
-| `GET`  | `/api/survey/` | List all surveys (name, surveyId, status) |
-| `GET`  | `/api/survey/:survey_id` | Get full survey by surveyId |
-| `PATCH`| `/api/survey/:survey_id` | Update survey fields (blocked if active/complete) |
-| `DELETE`| `/api/survey/:survey_id` | Delete a survey |
+**Auth & User Routes** (`/api/auth`, `/api/user`)
+- JWT-based authentication, password setup, role-based access control, and user management endpoints.
 
-**Response Routes** (`/api/response`)
-
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/response/:survey_id` | Submit a response (survey must be active) |
-| `GET`  | `/api/response/:survey_id` | Get all responses for a survey |
+**Campaign & Demographic Routes** (`/api/campaign`, `/api/demographic`)
+- Endpoints for creating targeted outreach campaigns (Excel upload or generated) and fetching demographic data for segmentation.
 
 ### MongoDB Schemas (main2 service)
 
-**`Survey`** — Identical schema to the `ai` service's `surveySchema.js` (shared definition):
-```js
-// see backend/main2/src/models/surveySchema.js
-// same as backend/ai/src/mongodb/surveySchema.js
-```
+**`Survey` & `SurveyResponse`**
+- The core schemas. Responses include geospatial, interview, and LGD/NSS sampling metadata.
 
-**`SurveyResponse`** — Rich response schema with geospatial and interview metadata:
-```js
-{
-  surveyId: ObjectId (ref: Survey),
-  surveyVersion: Number,
-  userInfo: {
-    fullname: String,
-    phone_no: String
-  },
-  paraInfo: {
-    latitude: String,
-    longitude: String,
-    deviceInfo: { os: String },
-    interviewInfo: {
-      interviewMode: String,        // e.g. "CAPI", "CATI", "IVR", "web"
-      interviewDurationMinutes: Number
-    },
-    lgdInfo: {
-      stateCode: String,            // LGD state code
-      districtCode: String,         // LGD district code
-      shortNameOfDistrict: String
-    },
-    samplingInfo: {
-      nssRegionCode: Number         // NSS Region code for sampling frame
-    }
-  },
-  responses: [{
-    qid: String,
-    answer: Mixed  // String for text/mcq, String[] for checkbox
-  }],
-  timestamps: true
-}
-```
+**`User`**
+- Handles RBAC, storing email, hashed password, roles (`admin`, `fod`, `sdrd`, `dpd`), and JWT tokens.
+
+**`CampaignTarget` & `Demographics`**
+- Stores target citizens for specific survey campaigns and tracks demographic metrics for segmentation.
 
 ### Response Validation Rules
 - **MCQ**: `answer` must be a string matching a valid `option.id` in the survey question
@@ -808,6 +779,19 @@ The `audio` fields inside both `backend/ai` and `backend/main2` schemas were uni
 ### AI Prompt Validation (Langchain)
 The AI backend was updated to correctly invoke the `prompt_validation_agent`. It now accurately intercepts vague survey prompts (e.g. "Generate a survey on consumption") and blocks generation, instead returning specific clarifying questions to the frontend. Natural language responses to these questions are intelligently appended to the context window and parsed by the Langchain agents.
 
+### AI Pipeline & UI Synchronization Stabilization
+- **Backend Stability:** Removed `--watch` flags from both `main2` and `ai` dev scripts to prevent server crashes (`ECONNRESET`) during background agent file writes.
+- **Strict Architectural Prompts:** Overhauled the `section_planner_system_prompt` and `question_generator_system_prompt` with aggressive system-level constraints to permanently eliminate duplicate AI-generated "Demographics" sections.
+- **Agent Reliability:** Refactored `prompt_validation_agent` to use direct LLM invocation (`llm_chat.invoke`), fixing random `JSON.parse` crashes when Langchain tools were omitted.
+- **Frontend Synchronization & UX:** Fixed an invalid toast method bug (`toast.addToast`) that crashed the dashboard polling loop. Replaced the spinning globe with an animated `AudioLines` (sound wave) icon during audio generation. Ensured the "Generate Audio" button remains accessible even for single-language surveys. Polished the `AIPromptBuilder` text area to auto-resize after submission and auto-focus when the AI asks clarifying questions.
+
+### Main Branch Integration (PR #65)
+- **Campaign Targeting & Demographics Expansion:** Merged massive new campaign features including `campaignController.js`, `campaignRoute.js`, and `campaignTarget.js` to support targeted outreach. Expanded `demographics.js` model and controllers.
+- **Firebase & Citizen Authentication:** Integrated Firebase config and implemented a robust `AuthModal.jsx` within the `citizen` frontend, backed by new `authController.js` and `authRoute.js` logic in the `main2` backend.
+
+### Survey Schema Updates (Local Changes)
+- **Channels & Access Types:** The `surveySchema.js` was expanded to include a strict `CHANNELS` enum (`"web"`, `"ivr"`, `"whatsapp"`) and an `accessType` field (`"general"`, `"targeted"`). Added `allowedChannels` validation to restrict survey distribution channels dynamically.
+
 ---
 
-*Last updated: 2026-06-01 | Maintained by the NARAD development team*
+*Last updated: 2026-06-03 | Maintained by the NARAD development team*

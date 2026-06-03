@@ -44,12 +44,23 @@ User wants context to build:`;
 
 const section_planner_system_prompt = `You are a strict JSON outputting agent. Your task is to plan the logical sections of a survey based on the user's input and context.
 Keep in mind that this survey is for directly asking citizens about their personal data, NOT asking government officials for aggregate data. Plan sections accordingly.
+
+SYSTEM ARCHITECTURE RULE (CRITICAL):
+This survey generation system AUTOMATICALLY injects a standardized "Demographics" section (containing Full Name, Age, Gender, Primary Language, UID, Pincode, Area) at the very beginning of every survey.
+Therefore, it is a FATAL ERROR for you to plan or include any sections related to:
+- Demographics
+- Respondent Profile
+- General Information / Background
+- Personal Details (Name, Age, Gender, Location, Contact info, etc.)
+
+Your planned sections must strictly focus ONLY on the specific subject matter, core analysis, and domain-specific topics requested by the user.
+
 You MUST output ONLY a valid JSON array. DO NOT use markdown, do NOT use backticks, do NOT add explanations.
 Format Example:
 [
   {
-    "sectionName": "Demographics",
-    "description": "Questions about age, gender, and location.",
+    "sectionName": "Subject Matter Topic",
+    "description": "Targeted questions assessing the core domain topics of the survey.",
     "questionCount": 3
   }
 ]
@@ -67,6 +78,10 @@ You are a survey question generator. Your sole job is to generate questions for 
 - CRITICAL: Questions MUST be addressed directly to the citizen/respondent (e.g., "What is your income?", not "What is the average income in the area?").
 - Do NOT ask for estimates, aggregate data, or statistics. Ask for the citizen's own personal data.
 
+SYSTEM ARCHITECTURE RULE (CRITICAL):
+The overarching survey already includes a built-in "Demographics" section (covering Full Name, Age, Gender, Primary Language, UID, Pincode, Area).
+You are STRICTLY FORBIDDEN from generating any questions asking for basic personal profiling information (e.g., age, gender, location, names, contact numbers) inside this section. Focus entirely on the specific analytical topic of this section.
+
 Output Schema:
 ${JSON.stringify(englishQuestionArraySchema, null, 2)}
 `;
@@ -80,6 +95,10 @@ You are a survey question generator. Your sole job is to generate questions for 
 - Generate questions specifically tailored to the requested section description.
 - CRITICAL: Questions MUST be addressed directly to the citizen/respondent (e.g., "What is your income?", not "What is the average income in the area?").
 - Do NOT ask for estimates, aggregate data, or statistics. Ask for the citizen's own personal data.
+
+SYSTEM ARCHITECTURE RULE (CRITICAL):
+The overarching survey already includes a built-in "Demographics" section (covering Full Name, Age, Gender, Primary Language, UID, Pincode, Area).
+You are STRICTLY FORBIDDEN from generating any questions asking for basic personal profiling information (e.g., age, gender, location, names, contact numbers) inside this section. Focus entirely on the specific analytical topic of this section.
 
 Output Schema:
 ${JSON.stringify(multiLangQuestionArraySchema, null, 2)}
