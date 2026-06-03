@@ -98,10 +98,14 @@ export async function generate_english_questions(user_input, surveyId, survey_na
             }
         ]
     };
-    
     questionSections.push(demographicsSection);
-    
-    let allGeneratedQuestions = [...demographicsSection.questions];
+
+    let allGeneratedQuestions = [
+        {
+            sectionName: demographicsSection.sectionName,
+            questions: demographicsSection.questions.map(q => ({ qid: q.qid }))
+        }
+    ];
 
     for (const section of sectionsPlan) {
         pushLog(id, `Generating questions for section: ${section.sectionName}`);
@@ -113,7 +117,10 @@ export async function generate_english_questions(user_input, surveyId, survey_na
             questionsForSection = [];
         }
 
-        allGeneratedQuestions = allGeneratedQuestions.concat(questionsForSection);
+        allGeneratedQuestions.push({
+            sectionName: section.sectionName || "General",
+            questions: questionsForSection.map(q => ({ qid: q.qid }))
+        });
 
         questionSections.push({
             sectionName: section.sectionName || "General",
