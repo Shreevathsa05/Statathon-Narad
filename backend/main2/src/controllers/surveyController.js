@@ -84,7 +84,6 @@ export const createSurvey = asyncHandler(async (req, res) => {
 });
 
 export const getAllSurveys = asyncHandler(async (req, res) => {
-	console.log("req");
 	const surveys = await Survey.find().select("name surveyId status questionSections supportedLanguages createdAt");
 
 	return res

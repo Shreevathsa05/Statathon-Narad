@@ -5,6 +5,7 @@ import { shouldShowField } from "../utils/ConditionEvaluator";
 import { BASE_URL, START_TIME } from "../constants";
 import { speak } from "../utils/textToSpeech";
 import { getOS } from "../utils/getOS";
+import AuthModal from "../components/survey/AuthModal";
 
 export default function SurveyPage() {
     const navigate = useNavigate();
@@ -20,6 +21,21 @@ export default function SurveyPage() {
 
     const [language, setLanguage] = useState("english");
     const [supportedLanguages, setSupportedLanguages] = useState([]);
+
+    const [auth, setAuth] = useState(null);
+    const [prefill, setPrefill] = useState(false);
+
+    const handleVerified = (data) => {
+        setAuth(data);
+
+        if (data.demographic) {
+            setPrefill(true);
+            setAnswers((prev) => ({
+                ...prev,
+                ...data.demographic
+            }));
+        }
+    };
 
     useEffect(() => {
         (async () => {
@@ -139,45 +155,41 @@ export default function SurveyPage() {
         }
     }
 
-    /* ---------- CONSENT SCREEN ---------- */
-    if (consent === null) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-bg px-4">
-                <div className="max-w-md w-full bg-surface border border-border rounded-xl shadow-md p-6 space-y-5">
-                    <h1 className="text-xl font-semibold text-text-primary">
-                        Consent Required
-                    </h1>
+    // /* ---------- CONSENT SCREEN ---------- */
+    // if (consent === null) {
+    //     return (
+    //         <div className="min-h-screen flex items-center justify-center bg-bg px-4">
+    //             <div className="max-w-md w-full bg-surface border border-border rounded-xl shadow-md p-6 space-y-5">
+    //                 <h1 className="text-xl font-semibold text-text-primary">
+    //                     Consent Required
+    //                 </h1>
 
-                    <p className="text-sm text-text-muted leading-relaxed">
-                        By continuing, you agree to participate in this survey and allow
-                        your responses to be used for research purposes.
-                    </p>
+    //                 <p className="text-sm text-text-muted leading-relaxed">
+    //                     By continuing, you agree to participate in this survey and allow
+    //                     your responses to be used for research purposes.
+    //                 </p>
 
-                    <div className="flex gap-3">
-                        <button
-                            onClick={() => handleConsent(true)}
-                            className="flex-1 bg-text-primary text-bg font-medium py-2 rounded-lg hover:bg-text-secondary transition-colors"
-                        >
-                            I Agree
-                        </button>
-                        <button
-                            onClick={() => handleConsent(false)}
-                            className="flex-1 border border-border bg-transparent text-text-muted font-medium py-2 rounded-lg hover:bg-surface-alt hover:text-text-primary transition-colors"
-                        >
-                            Decline
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
-    }
+    //                 <div className="flex gap-3">
+    //                     <button
+    //                         onClick={() => handleConsent(true)}
+    //                         className="flex-1 bg-text-primary text-bg font-medium py-2 rounded-lg hover:bg-text-secondary transition-colors"
+    //                     >
+    //                         I Agree
+    //                     </button>
+    //                     <button
+    //                         onClick={() => handleConsent(false)}
+    //                         className="flex-1 border border-border bg-transparent text-text-muted font-medium py-2 rounded-lg hover:bg-surface-alt hover:text-text-primary transition-colors"
+    //                     >
+    //                         Decline
+    //                     </button>
+    //                 </div>
+    //             </div>
+    //         </div>
+    //     );
+    // }
 
-    if (consent === false) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-bg text-text-muted">
-                Consent not provided.
-            </div>
-        );
+    if (!auth) {
+        return <AuthModal onVerified={handleVerified} />;
     }
 
     /* ---------- SURVEY UI ---------- */
@@ -213,7 +225,6 @@ export default function SurveyPage() {
                 {/* Questions */}
                 <section className="space-y-10">
                     {questionSections.map((section, index) => {
-
                         const visibleQuestions = section.questions.filter((q) =>
                             shouldShowField(q, answers));
 
@@ -235,6 +246,7 @@ export default function SurveyPage() {
 
                                     return (
                                         <div
+                                            disabled={prefill && index === 0}
                                             key={field.qid}
                                             className="bg-surface border border-border rounded-xl shadow-sm p-6 space-y-5 transition-colors"
                                         >
