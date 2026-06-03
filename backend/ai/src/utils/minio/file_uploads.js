@@ -26,6 +26,7 @@ export async function uploadAudio(surveyId, mp3AudioLocation) {
     await minioClient.fPutObject(bucket, destObjName, sourceFile, metaData);
 
     console.log('File', sourceFile, 'uploaded to bucket', bucket, 'at', destObjName)
+    fs.unlinkSync(sourceFile);
 }
 
-uploadAudio("1", "a1.mp3");
+// uploadAudio("1", "a1.mp3");

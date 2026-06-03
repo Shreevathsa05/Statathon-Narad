@@ -2,6 +2,9 @@
 import { Router } from "express";
 import minioClient from "../utils/minio/client.js";
 import stt_from_twilio_whisper, { stt_from_twilio_sarvam } from "../utils/stt.js";
+import { audio_generation } from "../utils/audio_generation.js";
+import { Survey } from "../mongodb/surveySchema.js";
+
 const speech_conversion_router = Router();
 
 // health 
@@ -44,5 +47,32 @@ speech_conversion_router.get('/audio/:surveyId/:audioId', (req, res) => {
         stream.pipe(res);
     });
 });
+
+speech_conversion_router.get("/generate_audio/:surveyId", async (req, res) => {
+    const surveyId = req.params.surveyId;
+    const survey = await Survey.findOne({ surveyId: surveyId });
+    
+    if (!survey) {
+        return res.status(404).send("Survey not found");
+    }
+
+    // Check if audio generation has been completed by checking the first question's audio
+    if (survey.questionSections && survey.questionSections.length > 0 &&
+        survey.questionSections[0].questions && survey.questionSections[0].questions.length > 0) {
+        
+        const firstQuestion = survey.questionSections[0].questions[0];
+        const firstLang = survey.supportedLanguages && survey.supportedLanguages.length > 0 
+            ? survey.supportedLanguages[0] 
+            : "english";
+
+        if (firstQuestion.audio && firstQuestion.audio.get(firstLang)) {
+            return res.send("Audio generation completed");
+        }
+    }
+    
+    // If not completed, start generation in the background
+    audio_generation(surveyId);
+    return res.send("Audio generation started");
+})
 
 export default speech_conversion_router;

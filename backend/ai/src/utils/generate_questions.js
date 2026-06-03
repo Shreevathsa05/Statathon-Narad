@@ -98,7 +98,6 @@ export async function generate_english_questions(user_input, surveyId) {
             }
         ]
     };
-
     questionSections.push(demographicsSection);
 
     let allGeneratedQuestions = [

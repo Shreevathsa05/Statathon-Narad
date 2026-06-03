@@ -6,6 +6,7 @@
 import crypto from "crypto"
 import audio_trial_base from "../../622d9442-ae59-431c-b26b-cb5aae459c3c.js";
 import { base64 } from "zod";
+import { sarvam_voice_generate } from "./tts.js"
 
 export async function generate_audio(text, language) {
     const lang_codes = {
@@ -41,7 +42,7 @@ export async function generate_audio(text, language) {
     }
 
     const res = await sarvam_voice_generate(text, lang);
-    console.log(res);
+    // console.log(res);
     // fs.writeFileSync(crypto.randomUUID() + ".txt", JSON.stringify(res));
 
     return JSON.stringify(res[0]);
@@ -67,29 +68,29 @@ export async function b64toMp3(b64string, folder, filename) {
     return filePath;
 }
 
-b64toMp3(audio_trial_base, "audio", crypto.randomUUID() + ".mp3");
+// b64toMp3(audio_trial_base, "audio", crypto.randomUUID() + ".mp3");
 
-const arr = [
-    {
-        script: "ನಿಮ್ಮ ಸರಾಸರಿ ಮಾಸಿಕ ಮನೆಯ ಆದಾಯ (ರೂಪಾಯಿಯಲ್ಲಿ) ಎಷ್ಟು?",
-        language: "kannada"
-    },
-    {
-        script: "ಹಿಂದೂ ಧರ್ಮದ ಬಗ್ಗೆ ನಿಮ್ಮ ತಿಳುವಳಿಕೆ ಏನು?",
-        language: "hindi"
-    },
-    // {
-    //     script: "What is the capital of India?",
-    //     language: "english"
-    // },
-    // {
-    //     script: "तुमच्या कुटुंबाच्या उत्पन्नाचा मुख्य स्रोत कोणता आहे?.. कृषी. मजदूरी/वेतन. व्यवसाय/स्व-रोजगार. इतर",
-    //     language: "marathi"
-    // }, {
-    //     script: "നിങ്ങളുടെ കുടുംബത്തിന്റെ വരുമാനത്തിന്റെ പ്രധാന സ്രോതസ്സ് ഏതാണ്?.. കൃഷി. വേതനം/ശമ്പളം. ബിസിനസ്/സ്വയം തൊഴിൽ. മറ്റ്",
-    //     language: "malayalam"
-    // }
-]
+// const arr = [
+//     {
+//         script: "ನಿಮ್ಮ ಸರಾಸರಿ ಮಾಸಿಕ ಮನೆಯ ಆದಾಯ (ರೂಪಾಯಿಯಲ್ಲಿ) ಎಷ್ಟು?",
+//         language: "kannada"
+//     },
+//     {
+//         script: "ಹಿಂದೂ ಧರ್ಮದ ಬಗ್ಗೆ ನಿಮ್ಮ ತಿಳುವಳಿಕೆ ಏನು?",
+//         language: "hindi"
+//     },
+//     {
+//         script: "What is the capital of India?",
+//         language: "english"
+//     },
+//     {
+//         script: "तुमच्या कुटुंबाच्या उत्पन्नाचा मुख्य स्रोत कोणता आहे?.. कृषी. मजदूरी/वेतन. व्यवसाय/स्व-रोजगार. इतर",
+//         language: "marathi"
+//     }, {
+//         script: "നിങ്ങളുടെ കുടുംബത്തിന്റെ വരുമാനത്തിന്റെ പ്രധാന സ്രോതസ്സ് ഏതാണ്?.. കൃഷി. വേതനം/ശമ്പളം. ബിസിനസ്/സ്വയം തൊഴിൽ. മറ്റ്",
+//         language: "malayalam"
+//     }
+// ]
 
 // for (let i = 0; i < arr.length; i++) {
 //     const element = arr[i];
