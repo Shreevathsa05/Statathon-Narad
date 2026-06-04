@@ -4,7 +4,7 @@ import { verifyJWT } from "../middleware/verifyJWT.js";
 
 const router = Router();
 
-router.route("/").post(verifyJWT, createDemographic);
+router.route("/").post(createDemographic);
 router.get("/lookup", getDemographic);
 
 export default router;

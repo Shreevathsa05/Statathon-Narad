@@ -6,7 +6,7 @@ import { hashAadhaar } from "../utils/hash.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { Demographics } from "../models/demographics.js";
-import admin from "../config/firebase.js";
+import twilioClient from "../config/twilio.js";
 import { CampaignTarget } from "../models/campaignTarget.js";
 import { Survey } from "../models/surveySchema.js";
 
@@ -163,32 +163,16 @@ export const startAuth = asyncHandler(async (req, res) => {
     }
 
     let user;
-    let normalizedPhone = value;
-    if (mode === "phone") {
-        normalizedPhone = value.replace(/\D/g, "").slice(-10);
-    }
-
     if (mode === "aadhaar") {
         const clean = value.replace(/\D/g, "");
         const hashedAadhaar = hashAadhaar(clean);
         user = await Demographics.findOne({ aadhaarNo: hashedAadhaar });
     } else if (mode === "phone") {
-        user = await Demographics.findOne({ phone: normalizedPhone });
+        user = await Demographics.findOne({ phone: value });
     }
-
-    if (!user) {
-        if (survey.accessType === "targeted") {
-            throw new ApiError(403, "You are not eligible for this survey");
-        }
-        if (mode === "aadhaar") {
-            throw new ApiError(404, "Aadhaar not found. Please try with phone number.");
-        }
-        return res.status(200).json(
-            new ApiResponse(200, { phone: `+91${normalizedPhone}` }, "User not found, proceed with phone input")
-        );
-    }
-
-    if (survey.accessType === "targeted") {
+    let phoneToVerify;
+    if (user) {
+        phoneToVerify = user.phone;
         const campaignUser = await CampaignTarget.exists({
             surveyId: survey._id,
             userKey: user.aadhaarNo
@@ -197,41 +181,74 @@ export const startAuth = asyncHandler(async (req, res) => {
         if (!campaignUser) {
             throw new ApiError(403, "You are not eligible for this survey");
         }
+    } else {
+        if (mode === "aadhaar") {
+            return res.status(200).json(
+                new ApiResponse(200, null, "User not found, proceed with phone input")
+            );
+        } else if (mode === "phone") {
+            phoneToVerify = value;
+        }
+    }
+
+    // Trigger Twilio OTP
+    const twilioServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
+    if (twilioClient && twilioServiceSid) {
+        try {
+            await twilioClient.verify.v2.services(twilioServiceSid)
+                .verifications.create({ to: `+91${phoneToVerify}`, channel: 'sms' });
+        } catch (err) {
+            console.error("Twilio Verification Error:", err);
+            throw new ApiError(500, "Failed to send OTP via Twilio");
+        }
     }
 
     return res.status(200).json(
-        new ApiResponse(200, { phone: `+91${user.phone}` }, "successfully fetched phone")
+        new ApiResponse(200, { phone: `+91${phoneToVerify}` }, "OTP sent successfully")
     );
 });
 
 export const completeAuth = asyncHandler(async (req, res) => {
-    const { value, mode, idToken } = req.body;
+    const { value, mode, otp } = req.body;
 
-    if (!value || !mode || !idToken) {
-        throw new ApiError(400, "Aadhaar/Phone and idToken are required");
+    if (!value || !mode || !otp) {
+        throw new ApiError(400, "Aadhaar/Phone and OTP are required");
     }
-
-    const decoded = await admin.auth().verifyIdToken(idToken);
-    const phoneFromFirebase = decoded.phone_number;
 
     let user;
-    let normalizedPhone = value;
-    if (mode === "phone") {
-        normalizedPhone = value.replace(/\D/g, "").slice(-10);
-    }
+    let phoneToVerify;
 
     if (mode === "aadhaar") {
         const clean = value.replace(/\D/g, "");
         const hashedAadhaar = hashAadhaar(clean);
         user = await Demographics.findOne({ aadhaarNo: hashedAadhaar });
+        if (user) phoneToVerify = user.phone;
     } else if (mode === "phone") {
-        user = await Demographics.findOne({ phone: normalizedPhone });
+        user = await Demographics.findOne({ phone: value });
+        phoneToVerify = value;
+    }
+
+    if (!phoneToVerify) {
+        throw new ApiError(400, "Could not determine phone number to verify");
+    }
+
+    // Verify OTP with Twilio
+    const twilioServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
+    if (twilioClient && twilioServiceSid) {
+        try {
+            const verificationCheck = await twilioClient.verify.v2.services(twilioServiceSid)
+                .verificationChecks.create({ to: `+91${phoneToVerify}`, code: otp });
+
+            if (verificationCheck.status !== 'approved') {
+                throw new ApiError(401, "Invalid OTP code");
+            }
+        } catch (err) {
+            console.error("Twilio Check Error:", err);
+            throw new ApiError(401, "OTP Verification Failed");
+        }
     }
 
     if (user) {
-        if (`+91${user.phone}` !== phoneFromFirebase) {
-            throw new ApiError(401, "Phone mismatch");
-        }
 
         return res.status(200).json(
             new ApiResponse(200, {
@@ -247,13 +264,9 @@ export const completeAuth = asyncHandler(async (req, res) => {
         );
     }
 
-    if (mode === "phone" && `+91${normalizedPhone}` !== phoneFromFirebase) {
-        throw new ApiError(401, "Phone mismatch");
-    }
-
     return res.status(200).json(
         new ApiResponse(200, {
             demographic: null,
         }, "New user verified")
     );
-});
+})

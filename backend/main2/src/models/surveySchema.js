@@ -19,6 +19,7 @@ const CHANNELS = [
 	"web",
 	"ivr",
 	"whatsapp",
+	"telegram",
 ];
 
 const ShowIfSchema = new mongoose.Schema(
@@ -155,8 +156,13 @@ const SurveySchema = new mongoose.Schema(
 		},
 		accessType: {
 			type: String,
-			enum: ["general", "targeted"],
-			default: "general"
+			enum: ["general", "targeted", null],
+			default: null,
+		},
+		targetSource: {
+			type: String,
+			enum: ["excel", "generated", null],
+			default: null,
 		},
 		supportedLanguages: {
 			type: [String],
@@ -178,11 +184,11 @@ const SurveySchema = new mongoose.Schema(
 			type: [String],
 			enum: CHANNELS,
 			validate: {
-				validator: (channels) =>
-					Array.isArray(channels) &&
-					channels.length > 0 &&
-					new Set(channels).size === channels.length,
-				message: "allowedChannels must be a unique non-empty array",
+				validator: (channels) => {
+					if (!channels || channels.length === 0) return true;
+					return new Set(channels).size === channels.length;
+				},
+				message: "allowedChannels must be a unique array",
 			},
 		},
 		categories: {

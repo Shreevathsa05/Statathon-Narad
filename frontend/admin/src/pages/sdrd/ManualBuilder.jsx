@@ -28,7 +28,7 @@ export default function ManualBuilder() {
         categories: category ? [category] : ['General'],
         questionSections: [
           {
-            sectionName: "User Demographics",
+            sectionName: "Demographics",
             questions: [
               {
                   qid: "fullname",
