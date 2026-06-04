@@ -14,6 +14,7 @@ import AIPromptBuilder from './pages/sdrd/AIPromptBuilder.jsx';
 import ManualBuilder from './pages/sdrd/ManualBuilder.jsx';
 import SurveyEditor from './pages/sdrd/SurveyEditor.jsx';
 import FODPage from './pages/fod/FODPage.jsx';
+import FODSurveyDetails from './pages/fod/FODSurveyDetails.jsx';
 import DPDPage from './pages/dpd/DPDPage.jsx';
 import CQCDPage from './pages/cqcd/CQCDPage.jsx';
 import FieldManagerPage from './pages/field-manager/FieldManagerPage.jsx';
@@ -60,6 +61,7 @@ export default function App() {
               {/* FOD Routes */}
               <Route path="fod" element={<ProtectedRoute allowedRoles={['admin', 'fod']}><Outlet /></ProtectedRoute>}>
                 <Route index element={<FODPage />} />
+                <Route path="survey/:surveyId" element={<FODSurveyDetails />} />
                 <Route path="managers" element={<UsersPage />} /> {/* Reused UsersPage for FOD */}
               </Route>
 
