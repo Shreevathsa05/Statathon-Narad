@@ -2,10 +2,19 @@
 import "dotenv/config"
 import fs from "fs";
 import { ChatOpenAI } from "@langchain/openai"
+import { CallbackHandler } from "@langfuse/langchain";
 import Groq from "groq-sdk";
 import { SarvamAIClient } from "sarvamai";
 
-// reasoning
+// Initialize Langfuse callback handler
+const langfuseHandler = new CallbackHandler({
+  publicKey: process.env.LANGFUSE_PUBLIC_KEY,
+  secretKey: process.env.LANGFUSE_SECRET_KEY,
+  baseUrl: process.env.LANGFUSE_BASE_URL,
+  enabled: process.env.LANGFUSE_ENABLED === "true"
+});
+
+// reasoning - with Langfuse tracing
 const llm_chat = new ChatOpenAI({
   model: process.env.CHAT_MODEL,
   apiKey: process.env.OPENAI_API_KEY,
@@ -33,4 +42,4 @@ const sarvam_voice = new SarvamAIClient({
   apiSubscriptionKey: process.env.SARVAM_API_KEY
 });
 
-export { llm_chat, stt, sarvam_voice }
+export { llm_chat, stt, sarvam_voice, langfuseHandler }
