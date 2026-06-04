@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { Globe, Volume2 } from "lucide-react";
 import { BASE_URL } from "../constants";
 
 export default function Home() {
@@ -24,7 +25,7 @@ export default function Home() {
         fetchSurveys();
     }, []);
 
-    const activeSurveys = surveys.filter((s) => s.status);
+    const activeSurveys = surveys.filter((s) => s.status === "active");
     console.log(activeSurveys);
 
     if (loading) {
@@ -59,8 +60,8 @@ export default function Home() {
                 {/* Page Header */}
                 <div className="flex items-center justify-between pb-6 mb-6 border-b border-border">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-text-primary mb-1">Citizen Portal</h1>
-                        <p className="text-sm text-text-muted">Participate in active surveys and contribute to data-driven decisions.</p>
+                        <h1 className="text-3xl font-semibold tracking-[-0.03em] text-text-primary mb-1">Citizen Portal</h1>
+                        <p className="text-[14px] text-text-muted">Participate in active surveys and contribute to data-driven decisions.</p>
                     </div>
                 </div>
 
@@ -81,31 +82,35 @@ export default function Home() {
                     </div>
                 ) : (
                     <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">
-                        {activeSurveys.map(survey => (
-                            <div 
-                                key={survey._id || survey.surveyId} 
-                                className="bg-bg border border-border rounded-md shadow-sm p-4 flex flex-col gap-4 cursor-pointer hover:border-black hover:shadow-md transition-all h-full" 
-                                onClick={() => navigate(`/survey/${survey.surveyId}`)}
-                            >
-                                <div className="flex justify-between items-start gap-3">
-                                    <h3 className="text-base font-medium text-text-primary m-0 leading-tight line-clamp-2 overflow-hidden">
-                                        {survey.name || 'Untitled Survey'}
-                                    </h3>
-                                    <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-medium rounded-full border uppercase tracking-wider shrink-0 bg-geist-blue/10 text-geist-blue border-geist-blue/20`}>
-                                        {survey.status}
-                                    </span>
-                                </div>
+                        {activeSurveys.map(survey => {
+                            let displayName = survey.name || 'Untitled Survey';
+                            if (displayName.startsWith("Survey on Survey on")) {
+                                displayName = displayName.replace("Survey on Survey on", "Survey on");
+                            }
 
-                                <div className="mt-auto pt-4 flex flex-col gap-2">
-                                    <div className="flex items-center justify-between text-[13px] text-text-muted">
-                                        <span>{new Date(survey.createdAt).toLocaleDateString()}</span>
-                                        <span className="font-mono text-[12px]">
-                                            #{survey.surveyId?.substring(0, 8)}
+                            return (
+                                <div 
+                                    key={survey._id || survey.surveyId} 
+                                    className="bg-bg border border-border rounded-md shadow-sm p-4 flex flex-col gap-4 cursor-pointer hover:border-black hover:shadow-md transition-all h-full group" 
+                                    onClick={() => navigate(`/survey/${survey.surveyId}`)}
+                                >
+                                    <div className="flex justify-between items-start gap-3">
+                                        <h3 className="text-base font-medium text-text-primary m-0 leading-tight line-clamp-2 overflow-hidden group-hover:text-geist-blue transition-colors">
+                                            {displayName}
+                                        </h3>
+                                        <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-medium rounded-full border uppercase tracking-wider shrink-0 bg-geist-blue/10 text-geist-blue border-geist-blue/20`}>
+                                            {survey.status}
                                         </span>
                                     </div>
+
+                                    <div className="mt-auto pt-4 flex flex-col gap-2">
+                                        <div className="flex items-center text-[13px] text-text-muted">
+                                            <span>{new Date(survey.createdAt).toLocaleDateString()}</span>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>

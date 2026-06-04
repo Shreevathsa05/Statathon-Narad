@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { Volume2 } from "lucide-react";
 import DynamicField from "../components/survey/DynamicField";
 import { shouldShowField } from "../utils/ConditionEvaluator";
 import { BASE_URL, START_TIME } from "../constants";
@@ -10,6 +11,15 @@ import AuthModal from "../components/survey/AuthModal";
 export default function SurveyPage() {
     const navigate = useNavigate();
     const { surveyId } = useParams();
+    
+    // Audio State & Refs
+    const [playingAudioId, setPlayingAudioId] = useState(null);
+    const audioRef = useRef(null);
+    const audioCtxRef = useRef(null);
+    const analyserRef = useRef(null);
+    const sourceNodeRef = useRef(null);
+    const reqAnimRef = useRef(null);
+    const activeQuestionRef = useRef(null);
 
     const [errors, setErrors] = useState("");
     const [loading, setLoading] = useState(true);
@@ -75,23 +85,82 @@ export default function SurveyPage() {
         setAnswers((prev) => ({ ...prev, [qid]: value }));
     };
 
+    const cleanupAudio = () => {
+        if (reqAnimRef.current) cancelAnimationFrame(reqAnimRef.current);
+        if (activeQuestionRef.current) {
+            activeQuestionRef.current.style.setProperty('--audio-intensity', '0');
+        }
+    };
+
     const handleSpeakQuestion = async (field) => {
         try {
-            if (!field.text?.[language]) return;
-
-            window.speechSynthesis.cancel();
-
-            await speak(field.text[language], language);
-
-            if (Array.isArray(field.options)) {
-                for (const opt of field.options) {
-                    if (opt.label?.[language]) {
-                        await speak(opt.label[language], language);
-                    }
-                }
+            const audioId = field.audio?.[language];
+            if (!audioId || audioId.trim() === "") {
+                setErrors("Pre-generated audio not found for this language.");
+                return;
             }
+
+            if (playingAudioId === audioId && audioRef.current) {
+                if (!audioRef.current.paused) {
+                    audioRef.current.pause();
+                    cleanupAudio();
+                    setPlayingAudioId(null);
+                }
+                return;
+            }
+
+            cleanupAudio();
+            setPlayingAudioId(audioId);
+
+            const url = `/speech/audio/${surveyId}/${audioId}`;
+            const audio = new Audio(url);
+            audio.crossOrigin = "anonymous";
+            audioRef.current = audio;
+
+            audio.onended = () => {
+                setPlayingAudioId(null);
+                cleanupAudio();
+            };
+
+            if (!audioCtxRef.current) {
+                audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+                analyserRef.current = audioCtxRef.current.createAnalyser();
+                analyserRef.current.fftSize = 256;
+            }
+            
+            if (audioCtxRef.current.state === 'suspended') {
+                await audioCtxRef.current.resume();
+            }
+
+            sourceNodeRef.current = audioCtxRef.current.createMediaElementSource(audio);
+            sourceNodeRef.current.connect(analyserRef.current);
+            analyserRef.current.connect(audioCtxRef.current.destination);
+
+            await audio.play();
+
+            const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+            const update = () => {
+                if (!analyserRef.current) return;
+                analyserRef.current.getByteFrequencyData(dataArray);
+                
+                let sum = 0;
+                for (let i = 0; i < dataArray.length; i++) {
+                    sum += dataArray[i];
+                }
+                const average = sum / dataArray.length;
+                const intensity = (average / 255).toFixed(3);
+
+                if (activeQuestionRef.current) {
+                    activeQuestionRef.current.style.setProperty('--audio-intensity', intensity);
+                }
+                
+                reqAnimRef.current = requestAnimationFrame(update);
+            };
+            update();
         } catch {
             setErrors("Unable to play audio. Please try again");
+            cleanupAudio();
+            setPlayingAudioId(null);
         }
     };
 
@@ -198,7 +267,7 @@ export default function SurveyPage() {
             {/* Header */}
             <header className="sticky top-0 z-20 bg-bg/80 backdrop-blur-md border-b border-border">
                 <div className="max-w-3xl mx-auto px-6 py-4 flex justify-between items-center">
-                    <h1 className="text-[15px] font-semibold text-text-primary tracking-tight">Survey Form</h1>
+                    <h1 className="text-[16px] font-semibold tracking-[-0.02em] text-text-primary">Survey Form</h1>
 
                     <select
                         value={language}
@@ -231,44 +300,47 @@ export default function SurveyPage() {
                         if (visibleQuestions.length === 0) return null;
 
                         return (
-                            <div key={index} className="space-y-6">
-
+                            <div key={index} className="bg-[#FAFAFA] border border-[#E5E5E5] rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
                                 {/* Section Header */}
-                                <div className="sticky top-[72px] z-10 bg-bg py-2">
-                                    <h2 className="text-sm font-semibold text-text-primary tracking-tight uppercase letter-spacing-[0.05em]">
+                                <div className="flex justify-between items-center bg-white rounded-t-xl border-b border-[#E5E5E5] px-6 py-4">
+                                    <h2 className="text-[16px] font-semibold tracking-[-0.02em] text-black m-0">
                                         {section.sectionName}
                                     </h2>
-                                    <div className="h-[1px] bg-border mt-3" />
                                 </div>
 
-                                {section.questions.map((field) => {
-                                    if (!shouldShowField(field, answers)) return null;
+                                <div className="px-6 py-2">
+                                    {section.questions.map((field, qIdx) => {
+                                        if (!shouldShowField(field, answers)) return null;
 
-                                    return (
-                                        <div
-                                            disabled={prefill && index === 0}
-                                            key={field.qid}
-                                            className="bg-surface border border-border rounded-xl shadow-sm p-6 space-y-5 transition-colors"
-                                        >
-                                            <DynamicField
-                                                field={field}
-                                                value={answers[field.qid]}
-                                                language={language}
-                                                onChange={handleChange}
-                                            />
+                                        const isActiveAudio = playingAudioId && playingAudioId === field.audio?.[language];
 
-                                            <div className="flex justify-end pt-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleSpeakQuestion(field)}
-                                                    className="inline-flex items-center justify-center gap-2 px-3 h-8 text-[13px] font-medium rounded-md bg-transparent border border-border text-text-muted hover:text-text-primary hover:bg-surface-alt transition-colors"
-                                                >
-                                                    🔊 Read
-                                                </button>
+                                        return (
+                                            <div
+                                                disabled={prefill && index === 0}
+                                                key={field.qid}
+                                                ref={isActiveAudio ? activeQuestionRef : null}
+                                                className={`transition-all duration-300 ${isActiveAudio ? 'audio-glow-wrapper bg-white shadow-sm rounded-xl p-6 -mx-6 my-4 border border-transparent' : `py-6 ${qIdx === section.questions.length - 1 ? '' : 'border-b border-[#E5E5E5]'}`}`}
+                                            >
+                                                <DynamicField
+                                                    field={field}
+                                                    value={answers[field.qid]}
+                                                    language={language}
+                                                    onChange={handleChange}
+                                                />
+
+                                                <div className="flex justify-end pt-4">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleSpeakQuestion(field)}
+                                                        className={`inline-flex items-center justify-center gap-1.5 text-[13px] font-medium transition-colors ${isActiveAudio ? 'text-black font-semibold' : 'text-[#737373] hover:text-black'}`}
+                                                    >
+                                                        <Volume2 size={16} className={isActiveAudio ? 'text-black' : ''} /> {isActiveAudio ? 'Stop' : 'Read'}
+                                                    </button>
+                                                </div>
                                             </div>
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    })}
+                                </div>
                             </div>
                         );
                     })}
@@ -280,7 +352,7 @@ export default function SurveyPage() {
                         onClick={handleSubmit}
                         disabled={submitLoading || loading}
                         className={`inline-flex items-center justify-center px-6 h-10 text-[14px] font-medium rounded-md transition-colors
-                            ${submitLoading || loading ? "bg-border text-text-muted cursor-not-allowed" : "bg-text-primary text-bg hover:bg-text-secondary"}
+                            ${submitLoading || loading ? "bg-border text-text-muted cursor-not-allowed" : "bg-black text-white hover:bg-gray-800 shadow-[0_4px_14px_0_rgb(0,0,0,0.1)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.15)]"}
                         `}
                     >
                         {submitLoading ? "Submitting..." : "Submit Survey"}
