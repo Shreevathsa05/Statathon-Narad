@@ -1,5 +1,5 @@
 // agents and their integerations here
-import { llm_chat } from "./llms.js";
+import { llm_chat, langfuseHandler } from "./llms.js";
 import { mcp_tools } from "../tools/multi_mcp_client.js";
 import { createAgent } from "langchain";
 import { 
@@ -35,7 +35,10 @@ export async function context_collector_agent(user_input, surveyId) {
                 content: `${context_collector_system_prompt}\n${user_input}`
             }
         ]
-    }, { recursionLimit: 100 });
+    }, { 
+        recursionLimit: 30,
+        callbacks: [langfuseHandler]
+    });
 
     const final = getFinalMessage(res.messages);
     pushLog(surveyId, "Context Collector Agent Completed");
@@ -63,7 +66,10 @@ export async function section_planner_agent(user_input, context_extracted, surve
                 content: `${section_planner_system_prompt}\n\nUser Input: ${user_input}\nContext Extracted: ${context_extracted}`
             }
         ]
-    }, { recursionLimit: 30 });
+    }, { 
+        recursionLimit: 30,
+        callbacks: [langfuseHandler]
+    });
 
     pushLog(surveyId, "Section Planner Agent Completed");
     
@@ -112,7 +118,10 @@ export async function question_generator_agent(user_input, context_summarized, s
                 content: `${question_generator_system_prompt}\n\nTopic: ${user_input}\nMOSPI extracted Context: ${context_summarized}\n\nSection to Generate: ${JSON.stringify(section, null, 2)}\n\nPreviously Generated Questions (DO NOT REPEAT THESE):\n${JSON.stringify(previous_questions, null, 2)}`
             }
         ]
-    }, { recursionLimit: 100 });
+    }, { 
+        recursionLimit: 30,
+        callbacks: [langfuseHandler]
+    });
 
     pushLog(surveyId, `Question Generator Agent Completed for section: ${section.sectionName}`);
     
@@ -161,7 +170,10 @@ export async function improve_section_agent(user_instructions, context_summarize
                 content: `${improve_section_system_prompt_english}\n\nMOSPI extracted Context: ${context_summarized}\n\nSection Description: ${JSON.stringify(section, null, 2)}\n\nExisting Questions:\n${JSON.stringify(current_questions, null, 2)}\n\nUser Instructions for Improvement:\n${user_instructions}`
             }
         ]
-    }, { recursionLimit: 100 });
+    }, { 
+        recursionLimit: 30,
+        callbacks: [langfuseHandler]
+    });
 
     console.log(`Improve Section Agent Completed for section: ${section.sectionName}`);
     
@@ -210,7 +222,10 @@ export async function multilang_translator_agent(question, target_languages, sur
                 content: `${multilang_translator_system_prompt}\n\nTarget Languages: ${target_languages.join(", ")}\n\nQuestion to translate:\n${JSON.stringify(question, null, 2)}`
             }
         ]
-    }, { recursionLimit: 100 });
+    }, { 
+        recursionLimit: 30,
+        callbacks: [langfuseHandler]
+    });
 
     pushLog(surveyId, `Multilang Translator Agent Completed.`);
     
@@ -250,7 +265,10 @@ export async function prompt_validation_agent(user_input) {
             content: `${prompt_validation_system_prompt}\n\nUser Input: ${user_input}`
         }
         ]
-    }, { recursionLimit: 100 });
+    }, { 
+        recursionLimit: 30,
+        callbacks: [langfuseHandler]
+    });
 
         console.log(`Prompt Validation Agent Completed.`);
         
