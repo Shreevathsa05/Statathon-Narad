@@ -4,8 +4,8 @@ import { ApiError } from "../utils/ApiError.js";
 
 export const verifyJWT = async (req, res, next) => {
     try {
-        // 1. Check for token in cookie
-        let token = req.cookies?.accessToken;
+        // 1. Check for token in cookie or query (for SSE)
+        let token = req.cookies?.accessToken || req.query?.token;
 
         if (!token) {
             return res.status(401).json({ message: "Unauthorised — no token provided" });

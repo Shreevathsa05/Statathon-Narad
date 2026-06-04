@@ -13,7 +13,9 @@ import {
   CheckCircle, 
   Download, 
   Search,
-  LogOut
+  LogOut,
+  Sparkles,
+  Edit
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext.jsx';
 
@@ -32,7 +34,9 @@ const NAV = {
   ],
   sdrd: [
     { section: 'SDRD', links: [
-      { to: '/sdrd',        label: 'Survey Builder', icon: ClipboardList },
+      { to: '/sdrd',                 label: 'SDRD Dashboard',        icon: BarChart },
+      { to: '/sdrd/ai-builder',      label: 'AI Survey Builder',     icon: Sparkles },
+      { to: '/sdrd/manual-builder',  label: 'Manual Survey Builder', icon: Edit },
     ]},
   ],
   fod: [
