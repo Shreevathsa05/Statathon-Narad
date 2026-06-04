@@ -1,0 +1,58 @@
+version: '3.8'
+name: "start backend"
+services:
+  main2:
+    build:
+      context: ./backend/main2
+      dockerfile: Dockerfile
+    container_name: statathon-main2
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    env_file:
+      - ./backend/main2/.env
+    networks:
+      - statathon-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  ai:
+    build:
+      context: ./backend/ai
+      dockerfile: Dockerfile
+    container_name: statathon-ai
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    env_file:
+      - ./backend/ai/.env
+    networks:
+      - statathon-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+
+
+networks:
+  statathon-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+    driver: local
+  mongodb_config:
+    driver: local
