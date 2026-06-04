@@ -63,6 +63,7 @@ export default function App() {
                 {/* FOD Routes */}
                 <Route path="fod" element={<ProtectedRoute allowedRoles={['admin', 'fod']}><Outlet /></ProtectedRoute>}>
                   <Route index element={<FODPage />} />
+                  <Route path="survey/:surveyId" element={<FODSurveyDetails />} />
                   <Route path="managers" element={<UsersPage />} /> {/* Reused UsersPage for FOD */}
                 </Route>
 

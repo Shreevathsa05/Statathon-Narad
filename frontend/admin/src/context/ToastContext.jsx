@@ -45,14 +45,24 @@ export const ToastProvider = ({ children }) => {
 
 const ToastItem = ({ toast, removeToast }) => {
   const [isLeaving, setIsLeaving] = useState(false);
+  const [progressWidth, setProgressWidth] = useState('100%');
 
   useEffect(() => {
     if (toast.duration !== Infinity) {
-      const timer = setTimeout(() => {
+      // Start the progress bar transition shortly after mount
+      const progressTimer = setTimeout(() => {
+        setProgressWidth('0%');
+      }, 50);
+
+      const closeTimer = setTimeout(() => {
         setIsLeaving(true);
         setTimeout(() => removeToast(toast.id), 300); // Wait for exit animation
       }, toast.duration);
-      return () => clearTimeout(timer);
+
+      return () => {
+        clearTimeout(progressTimer);
+        clearTimeout(closeTimer);
+      };
     }
   }, [toast, removeToast]);
 
@@ -77,21 +87,32 @@ const ToastItem = ({ toast, removeToast }) => {
 
   return (
     <div
-      className={`pointer-events-auto flex items-start gap-3 p-3 bg-white border border-[#E5E5E5] rounded-lg shadow-[0_4px_6px_rgba(0,0,0,0.07),0_2px_4px_rgba(0,0,0,0.06)] transition-all duration-300 ease-out
+      className={`pointer-events-auto relative overflow-hidden flex items-start gap-3 p-3 bg-white border border-[#E5E5E5] rounded-lg shadow-[0_4px_6px_rgba(0,0,0,0.07),0_2px_4px_rgba(0,0,0,0.06)] transition-all duration-300 ease-out
       ${isLeaving ? 'opacity-0 translate-y-2' : 'animate-in fade-in slide-in-from-bottom-5'}`}
     >
-      <div className="mt-0.5 shrink-0">{getIcon()}</div>
-      <div className="flex-1 min-w-0">
+      <div className="mt-0.5 shrink-0 z-10">{getIcon()}</div>
+      <div className="flex-1 min-w-0 z-10">
         <p className="text-[13px] font-medium text-[#000000] leading-snug m-0 break-words">
           {toast.message}
         </p>
       </div>
       <button
         onClick={handleClose}
-        className="shrink-0 p-1 -m-1 text-[#737373] hover:text-[#000000] transition-colors rounded hover:bg-black/5"
+        className="shrink-0 p-1 -m-1 text-[#737373] hover:text-[#000000] transition-colors rounded hover:bg-black/5 z-10"
       >
         <X size={14} />
       </button>
+
+      {/* Progress Bar */}
+      {toast.duration !== Infinity && (
+        <div
+          className="absolute bottom-0 left-0 h-[3px] bg-[#3291FF] transition-all ease-linear"
+          style={{
+            width: progressWidth,
+            transitionDuration: `${toast.duration}ms`,
+          }}
+        />
+      )}
     </div>
   );
 };

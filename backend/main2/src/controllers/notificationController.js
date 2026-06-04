@@ -7,7 +7,7 @@ let activeClients = [];
 export const getNotifications = async (req, res, next) => {
   try {
     const userRole = req.user.role; // Set by verifyJWT
-    const userId = req.user._id;
+    const userId = req.user.userId;
 
     // Build the query to get notifications for this role or global ones
     const query = {
@@ -38,12 +38,12 @@ export const getNotifications = async (req, res, next) => {
 export const markAsRead = async (req, res, next) => {
   try {
     const notificationId = req.params.id;
-    const userId = req.user._id;
+    const userId = req.user.userId;
 
     const notification = await Notification.findByIdAndUpdate(
       notificationId,
       { $addToSet: { readBy: userId } }, // Only add if not already present
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!notification) {
