@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { generateTargetsFromDemographics, uploadCampaignExcel } from "../controllers/campaignController.js";
+import { generateTargetsFromDemographics, uploadCampaignExcel, getCampaignTargets } from "../controllers/campaignController.js";
 import { upload } from "../middleware/multer.js";
 import { verifyJWT } from "../middleware/verifyJWT.js";
 
@@ -13,5 +13,6 @@ router.post(
 );
 
 router.post("/generate/:surveyId", generateTargetsFromDemographics);
+router.get("/targets/:surveyId", getCampaignTargets);
 
 export default router;

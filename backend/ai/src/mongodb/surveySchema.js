@@ -127,6 +127,11 @@ const SurveySchema = new mongoose.Schema({
         enum: ["pending", "approved", "active", "complete", "updating", "translating", "generating_audio"],
         required: true,
     },
+    accessType: {
+        type: String,
+        enum: ["general", "targeted"],
+        default: "general"
+    },
     supportedLanguages: {
         type: [String],
         enum: LANGUAGES,
@@ -143,6 +148,18 @@ const SurveySchema = new mongoose.Schema({
     questionSections: {
         type: [questionSectionSchema],
         required: true,
+    },
+
+    allowedChannels: {
+        type: [String],
+        enum: CHANNELS,
+        validate: {
+            validator: (channels) =>
+                Array.isArray(channels) &&
+                channels.length > 0 &&
+                new Set(channels).size === channels.length,
+            message: "allowedChannels must be a unique non-empty array",
+        },
     },
 
     categories: {
