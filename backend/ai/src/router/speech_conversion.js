@@ -75,4 +75,40 @@ speech_conversion_router.get("/generate_audio/:surveyId", async (req, res) => {
     return res.send("Audio generation started");
 })
 
+speech_conversion_router.delete("/delete_audio/:surveyId", async (req, res) => {
+    const surveyId = req.params.surveyId;
+    const survey = await Survey.findOne({ surveyId: surveyId });
+    
+    if (!survey) {
+        return res.status(404).send("Survey not found");
+    }
+
+    let updatesMade = false;
+    // Iterate through all sections and questions to clear the audio maps
+    for (const section of survey.questionSections) {
+        for (const question of section.questions) {
+            if (question.audio) {
+                // For every language that has an audio ID, clear it
+                for (const language of question.audio.keys()) {
+                    // You could also add minioClient.removeObject(...) here if you want to delete the actual files
+                    if (question.audio.get(language).trim() !== "") {
+                        question.audio.set(language, "");
+                        updatesMade = true;
+                    }
+                }
+            }
+        }
+    }
+
+    if (updatesMade) {
+        await Survey.updateOne(
+            { surveyId: surveyId },
+            { $set: { questionSections: survey.questionSections } }
+        );
+        return res.send("All audio IDs have been cleared from the database.");
+    }
+
+    return res.send("No audio IDs were found to delete.");
+});
+
 export default speech_conversion_router;
