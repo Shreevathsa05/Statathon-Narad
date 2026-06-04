@@ -19,6 +19,7 @@ const CHANNELS = [
 	"web",
 	"ivr",
 	"whatsapp",
+	"telegram",
 ];
 
 const ShowIfSchema = new mongoose.Schema(
@@ -156,7 +157,7 @@ const SurveySchema = new mongoose.Schema(
 		accessType: {
 			type: String,
 			enum: ["general", "targeted"],
-			required: true,
+			default: "general",
 		},
 		supportedLanguages: {
 			type: [String],
@@ -177,7 +178,6 @@ const SurveySchema = new mongoose.Schema(
 		allowedChannels: {
 			type: [String],
 			enum: CHANNELS,
-			required: true,
 			validate: {
 				validator: (channels) =>
 					Array.isArray(channels) &&
