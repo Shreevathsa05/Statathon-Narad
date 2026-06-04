@@ -15,6 +15,7 @@ import AIPromptBuilder from './pages/sdrd/AIPromptBuilder.jsx';
 import ManualBuilder from './pages/sdrd/ManualBuilder.jsx';
 import SurveyEditor from './pages/sdrd/SurveyEditor.jsx';
 import FODPage from './pages/fod/FODPage.jsx';
+import FODSurveyDetails from './pages/fod/FODSurveyDetails.jsx';
 import DPDPage from './pages/dpd/DPDPage.jsx';
 import CQCDPage from './pages/cqcd/CQCDPage.jsx';
 import FieldManagerPage from './pages/field-manager/FieldManagerPage.jsx';
