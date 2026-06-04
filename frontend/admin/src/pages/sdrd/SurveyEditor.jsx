@@ -781,7 +781,7 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
               
               {isPending && (
                 <div className="flex gap-2">
-                  {sec.sectionName === survey?.questionSections?.[secIdx]?.sectionName && sec.sectionName?.toLowerCase() !== 'user demographics' && (
+                  {sec.sectionName === survey?.questionSections?.[secIdx]?.sectionName && sec.sectionName?.toLowerCase() !== 'demographics' && (
                     <button
                       className="inline-flex items-center gap-1.5 px-2.5 h-7 text-xs font-medium rounded text-geist-blue bg-geist-blue/10 border border-geist-blue/20 hover:bg-geist-blue/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={() => {
@@ -809,7 +809,7 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
                         <Save size={14} /> Save
                       </button>
                     </>
-                  ) : sec.sectionName?.toLowerCase() !== 'user demographics' && (
+                  ) : sec.sectionName?.toLowerCase() !== 'demographics' && (
                     <button
                       className="inline-flex items-center gap-1.5 px-2.5 h-7 text-xs font-medium rounded bg-white border border-border text-text-primary hover:bg-surface-alt transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={() => setEditingSections(prev => ({ ...prev, [secIdx]: true }))}
