@@ -4,6 +4,7 @@ import minioClient from "../utils/minio/client.js";
 import stt_from_twilio_whisper, { stt_from_twilio_sarvam } from "../utils/stt.js";
 import { audio_generation } from "../utils/audio_generation.js";
 import { Survey } from "../mongodb/surveySchema.js";
+import { surveyLogs } from "./question_generation_route.js";
 
 const speech_conversion_router = Router();
 
@@ -53,7 +54,7 @@ speech_conversion_router.get("/generate_audio/:surveyId", async (req, res) => {
     const survey = await Survey.findOne({ surveyId: surveyId });
     
     if (!survey) {
-        return res.status(404).send("Survey not found");
+        return res.status(404).json({ error: "Survey not found" });
     }
 
     // Check if audio generation has been completed by checking the first question's audio
@@ -65,14 +66,18 @@ speech_conversion_router.get("/generate_audio/:surveyId", async (req, res) => {
             ? survey.supportedLanguages[0] 
             : "english";
 
-        if (firstQuestion.audio && firstQuestion.audio.get(firstLang)) {
-            return res.send("Audio generation completed");
+        const firstLangAudio = firstQuestion.audio && firstQuestion.audio.get(firstLang);
+        if (firstLangAudio && firstLangAudio.trim() !== "") {
+            return res.json({ status: "completed", message: "Audio generation completed" });
         }
     }
     
     // If not completed, start generation in the background
+    await Survey.findOneAndUpdate({ surveyId }, { $set: { status: "generating_audio" } });
+    surveyLogs.delete(surveyId);
+    
     audio_generation(surveyId);
-    return res.send("Audio generation started");
+    return res.json({ surveyId, status: "generating_audio" });
 })
 
 speech_conversion_router.delete("/delete_audio/:surveyId", async (req, res) => {

@@ -2,6 +2,13 @@ import bcrypt from "bcryptjs";
 import { User } from "../models/userSchema.js";
 import { signAccessToken, signRefreshToken, verifyToken } from "../utils/jwtHelper.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { hashAadhaar } from "../utils/hash.js";
+import { ApiError } from "../utils/ApiError.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
+import { Demographics } from "../models/demographics.js";
+import admin from "../config/firebase.js";
+import { CampaignTarget } from "../models/campaignTarget.js";
+import { Survey } from "../models/surveySchema.js";
 
 const COOKIE_OPTS = {
     httpOnly: true,
@@ -134,3 +141,95 @@ export const logout = asyncHandler(async (req, res) => {
 export const me = asyncHandler(async (req, res) => {
     return res.status(200).json({ user: req.user });
 });
+
+// aadhar/phone verification
+
+// POST /auth/start
+export const startAuth = asyncHandler(async (req, res) => {
+    const { value, mode } = req.body;
+    const { surveyId } = req.params;
+
+    if (!value || !mode) {
+        throw new ApiError(400, "Aadhar/Phone is required");
+    }
+
+    if (!surveyId) {
+        throw new ApiError(400, "surveyId is required");
+    }
+
+    const survey = await Survey.findOne({ surveyId });
+    if (!survey) {
+        throw new ApiError(404, "Survey not found");
+    }
+
+    let user;
+    if (mode === "aadhaar") {
+        const clean = value.replace(/\D/g, "");
+        const hashedAadhaar = hashAadhaar(clean);
+        user = await Demographics.findOne({ aadhaarNo: hashedAadhaar });
+    } else if (mode === "phone") {
+        user = await Demographics.findOne({ phone: value });
+    }
+    if (!user) {
+        return res.status(200).json(
+            new ApiResponse(200, null, "User not found, proceed with phone input")
+        );
+    }
+
+    const campaignUser = await CampaignTarget.exists({
+        surveyId: survey._id,
+        userKey: user.aadhaarNo
+    });
+
+    if (!campaignUser) {
+        throw new ApiError(403, "You are not eligible for this survey");
+    }
+
+    return res.status(200).json(
+        new ApiResponse(200, { phone: `+91${user.phone}` }, "sucessfully fetched phone")
+    );
+});
+
+export const completeAuth = asyncHandler(async (req, res) => {
+    const { value, mode, idToken } = req.body;
+
+    if (!value || !mode || !idToken) {
+        throw new ApiError(400, "Aadhaar/Phone and idToken are required");
+    }
+
+    // const decoded = await admin.auth().verifyIdToken(idToken);
+    let user;
+    if (mode === "aadhaar") {
+        const clean = value.replace(/\D/g, "");
+        const hashedAadhaar = hashAadhaar(clean);
+        user = await Demographics.findOne({ aadhaarNo: hashedAadhaar });
+    } else if (mode === "phone") {
+        user = await Demographics.findOne({ phone: value });
+    }
+
+    if (user) {
+        const phoneFromFirebase = `+91${user.phone}`;
+        if (`+91${user.phone}` !== phoneFromFirebase) {
+            throw new ApiError(401, "Phone mismatch");
+        }
+
+        return res.status(200).json(
+            new ApiResponse(200, {
+                demographic: {
+                    fullname: user.fullName,
+                    age: user.age,
+                    gender: user.gender,
+                    primarylanguage: user.primaryLanguage,
+                    pincode: user.pincode,
+                    area: user.area,
+                }
+            }, "Existing user verified")
+        );
+    }
+
+    return res.status(200).json(
+        new ApiResponse(200, {
+            demographic: null,
+        }, "New user verified")
+    );
+})

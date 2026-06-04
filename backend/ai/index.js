@@ -4,6 +4,7 @@ import connectDB from "./src/mongodb/connect.js";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { LangfuseSpanProcessor } from "@langfuse/otel";
 import { CallbackHandler } from "@langfuse/langchain";
+import { Survey } from "./src/mongodb/surveySchema.js";
 
 const sdk = new NodeSDK({
     spanProcessors: [new LangfuseSpanProcessor()],
@@ -13,13 +14,23 @@ const sdk = new NodeSDK({
 export const langfuseHandler = new CallbackHandler();
 
 sdk.start();
+
 const PORT = process.env.PORT || 3000;
 
 async function startServer() {
     try {
         await connectDB();
 
-        app.listen(PORT, '0.0.0.0', () => {
+        // Reset any surveys that were stuck due to a previous crash
+        const stuckSurveys = await Survey.updateMany(
+            { status: { $in: ["translating", "updating", "generating_audio"] } },
+            { $set: { status: "pending" } }
+        );
+        if (stuckSurveys.modifiedCount > 0) {
+            console.log(`Reset ${stuckSurveys.modifiedCount} stuck surveys to 'pending'.`);
+        }
+
+        app.listen(PORT, () => {
             console.log(`Server listening on ${PORT}`);
         });
     } catch (error) {

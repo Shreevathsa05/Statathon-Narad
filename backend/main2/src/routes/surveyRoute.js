@@ -4,6 +4,6 @@ import { verifyJWT } from "../middleware/verifyJWT.js";
 
 const router = Router();
 
-router.route("/").post(verifyJWT, createSurvey).get(verifyJWT, getAllSurveys);
+router.route("/").post(verifyJWT, createSurvey).get(getAllSurveys);
 router.route("/:survey_id").get(getSurveyById).patch(verifyJWT, updateSurvey).delete(verifyJWT, deleteSurvey);
 export default router;

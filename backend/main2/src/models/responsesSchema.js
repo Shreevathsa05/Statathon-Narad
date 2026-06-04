@@ -45,6 +45,9 @@ const ParaInfoSchema = new mongoose.Schema(
 				type: String,
 				// required: true
 			},
+			pincode: {
+				type: String,
+			},
 			census_2011: {
 				type: String,
 			},

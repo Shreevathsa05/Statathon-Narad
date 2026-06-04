@@ -270,16 +270,16 @@ export async function prompt_validation_agent(user_input) {
         callbacks: [langfuseHandler]
     });
 
-    console.log(`Prompt Validation Agent Completed.`);
-    
+        console.log(`Prompt Validation Agent Completed.`);
+        
     let content = getFinalMessage(res.messages);
-    
-    console.log(`=== RAW PROMPT VALIDATOR RESPONSE ===`);
-    console.log(content);
-    console.log("=========================================");
+        
+        console.log(`=== RAW PROMPT VALIDATOR RESPONSE ===`);
+        console.log(content);
+        console.log("=========================================");
 
     if (typeof content === "string") {
-        content = content.replace(/```json/gi, "").replace(/```/g, "").trim();
+            content = content.replace(/```json/gi, "").replace(/```/g, "").trim();
         try {
             return JSON.parse(content);
         } catch (e) {

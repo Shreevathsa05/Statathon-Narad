@@ -123,6 +123,7 @@ export default function AIPromptBuilder() {
 
   const messagesEndRef = useRef(null);
   const logContainerRef = useRef(null);
+  const textareaRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -135,6 +136,13 @@ export default function AIPromptBuilder() {
     }
   }, [agentLogs]);
 
+  // Auto-focus the input box when the AI finishes thinking and prompts the user
+  useEffect(() => {
+    if (status !== 'processing' && status !== 'completed' && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [status]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!inputValue.trim() || status === 'processing' || status === 'completed') return;
@@ -143,6 +151,9 @@ export default function AIPromptBuilder() {
     
     setMessages(prev => [...prev, { role: 'user', content: currentInput }]);
     setInputValue('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
     setError(null);
     setAgentStep(0);
     
@@ -503,6 +514,7 @@ export default function AIPromptBuilder() {
             <div className={`transition-all duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] ${status === 'processing' ? 'ai-glow-wrapper shadow-md scale-[1.01]' : 'p-0 shadow-sm rounded-2xl'}`}>
               <form onSubmit={handleSubmit} className={`relative flex flex-col rounded-2xl transition-all ${status === 'processing' ? 'ai-glow-inner' : 'bg-[#F0F0F0] border border-border focus-within:border-geist-blue focus-within:ring-[3px] focus-within:ring-geist-blue/10'}`}>
               <textarea
+                ref={textareaRef}
                 className="w-full bg-transparent border-none outline-none text-[15px] text-text-primary resize-none min-h-[60px] max-h-[200px] py-4 pl-5 pr-14 overflow-y-auto leading-relaxed"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}

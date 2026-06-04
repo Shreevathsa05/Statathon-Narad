@@ -6,6 +6,8 @@ import authRoute from "./routes/authRoute.js";
 import userRoute from "./routes/userRoute.js";
 import surveyRoute from "./routes/surveyRoute.js";
 import responseRoute from "./routes/responseRoute.js";
+import demographicRoute from "./routes/demographicRoute.js";
+import campaignRoute from "./routes/campaignRoute.js";
 import { verifyJWT } from "./middleware/verifyJWT.js";
 
 const app = express();
@@ -33,8 +35,13 @@ app.use('/api/users', userRoute);
 // Protected data routes
 app.use('/api/survey', surveyRoute);
 app.use('/api/response', responseRoute);
+app.use('/api/demographic', demographicRoute);
+app.use('/api/campaign', campaignRoute);
 
 // Health check
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
+
+import errorHandler from "./middleware/errorMiddleware.js"
+app.use(errorHandler);
 
 export default app;

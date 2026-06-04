@@ -166,6 +166,9 @@ question_generation_router.post('/generate_questions_multilang', async (req, res
                 .catch(err => {
                     console.error(`Translation failed for ${surveyId}:`, err);
                 });
+        }).catch(err => {
+            console.error("Failed to dynamically import translate_survey:", err);
+            Survey.findOneAndUpdate({ surveyId }, { $set: { status: "pending" } }).exec();
         });
 
         res.json({
@@ -191,10 +194,10 @@ question_generation_router.get('/poll_questions_multilang/:surveyId', async (req
 
         if (survey.status === "pending") {
             surveyLogs.delete(surveyId);
-            return res.json({ status: "completed", data: survey });
+            return res.json({ status: "pending", data: survey });
         } else {
             const logs = surveyLogs.get(surveyId) || [];
-            return res.json({ status: "processing", logs: logs });
+            return res.json({ status: survey.status, logs: logs });
         }
     } catch (err) {
         console.error("Error polling multilang survey:", err);

@@ -15,4 +15,7 @@ export const surveyClient = {
   
   // Approve a survey (updates status to 'approved')
   approveSurvey: (surveyId) => client.patch(`/survey/${surveyId}`, { status: 'approved' }),
+
+  // Delete a survey
+  deleteSurvey: (surveyId) => client.delete(`/survey/${surveyId}`),
 };
