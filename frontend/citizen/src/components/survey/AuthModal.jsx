@@ -1,6 +1,4 @@
-import { useState, useEffect } from "react";
-import { auth } from "../../config/firebase";
-import { RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
+import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { BASE_URL } from "../../constants";
 
@@ -11,30 +9,9 @@ export default function AuthModal({ onVerified }) {
     const [value, setValue] = useState("");
     const [otp, setOtp] = useState("");
     const [errorMsg, setErrorMsg] = useState("");
-    const [loading, setLoading] = useState(false); // ✅ Fix 1: removed broken "const []"
 
-    useEffect(() => {
-        // ✅ Fix 2: always create a fresh verifier on mount; never reuse a stale one
-        window.recaptchaVerifier = new RecaptchaVerifier(
-            auth,
-            "recaptcha-container",
-            { size: "invisible" }
-        );
 
-        return () => {
-            // ✅ Fix 3: clean up verifier on unmount to avoid "already rendered" errors
-            window.recaptchaVerifier?.clear();
-            window.recaptchaVerifier = null;
-        };
-    }, []);
-
-    const resetRecaptcha = () => {
-        // ✅ Fix 4: helper to reset reCAPTCHA after a failed signInWithPhoneNumber,
-        //    as required by the Firebase docs
-        window.recaptchaVerifier?.render().then((widgetId) => {
-            window.grecaptcha?.reset(widgetId);
-        });
-    };
+    const [loading, setLoading] = useState(false);
 
     const handleSendOtp = async () => {
         if (!value || !mode) return;
@@ -51,18 +28,9 @@ export default function AuthModal({ onVerified }) {
             const data = await res.json();
             if (!res.ok) throw new Error(data.message);
 
-            const phone = data.data.phone;
-            const confirmationResult = await signInWithPhoneNumber(
-                auth,
-                phone,
-                window.recaptchaVerifier
-            );
-
-            window.confirmationResult = confirmationResult;
             setStep("otp");
         } catch (err) {
             setErrorMsg(err.message || "Something went wrong");
-            resetRecaptcha(); // ✅ Fix 4: reset on failure so user can retry
         } finally {
             setLoading(false);
         }
@@ -74,14 +42,10 @@ export default function AuthModal({ onVerified }) {
         setErrorMsg("");
 
         try {
-            // ✅ Fix 5: actually confirm the OTP with Firebase before calling your backend
-            const result = await window.confirmationResult.confirm(otp);
-            const idToken = await result.user.getIdToken();
-
             const res = await fetch(`${BASE_URL}/auth/complete/${surveyId}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ value, mode, idToken }), // ✅ real token
+                body: JSON.stringify({ value, mode, otp }),
             });
 
             const data = await res.json();
@@ -97,15 +61,13 @@ export default function AuthModal({ onVerified }) {
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-white px-4">
-            <div className="w-full max-w-sm border border-[#E5E5E5] rounded-md p-6 space-y-5">
+            <div className="w-full max-w-sm border border-[#E5E5E5] rounded-xl p-6 space-y-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] bg-white">
                 <div className="space-y-1">
-                    <h1 className="text-[16px] font-medium text-black">Verify your identity</h1>
+                    <h1 className="text-[16px] font-semibold tracking-[-0.02em] text-black">Verify your identity</h1>
                     <p className="text-[13px] text-[#737373]">
                         Enter your {mode === "aadhaar" ? "Aadhaar number" : "phone number"}
                     </p>
                 </div>
-
-                <div id="recaptcha-container"></div>
 
                 {errorMsg && (
                     <div className="bg-red-50 border border-red-200 text-red-700 text-[13px] p-3 rounded-md">
@@ -155,6 +117,18 @@ export default function AuthModal({ onVerified }) {
                             Change {mode}
                         </button>
                     </>
+                )}
+
+                {/* Dev Bypass */}
+                {import.meta.env.DEV && (
+                    <div className="pt-4 border-t border-[#E5E5E5] mt-4">
+                        <button
+                            onClick={() => onVerified({ demographic: { name: "Dev User", phone: "9999999999" } })}
+                            className="w-full h-8 border border-dashed border-[#A1A1A1] text-[#737373] text-[12px] rounded-md hover:border-black hover:text-black transition-colors"
+                        >
+                            Bypass Auth (Dev Only)
+                        </button>
+                    </div>
                 )}
             </div>
         </div>

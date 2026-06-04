@@ -9,8 +9,8 @@ export default function DynamicField({ field, value, onChange, language }) {
 						{field.options.map((opt) => (
 							<label
 								key={opt.id}
-								className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors
-                  ${value === opt.id ? "border-geist-blue bg-geist-blue/10" : "border-border hover:bg-surface-alt"}
+								className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-all
+                  ${value === opt.id ? "border-black bg-white ring-1 ring-black shadow-sm" : "border-[#E5E5E5] bg-white hover:border-[#A3A3A3]"}
                 `}
 							>
 								<input
@@ -18,7 +18,7 @@ export default function DynamicField({ field, value, onChange, language }) {
 									name={field.qid}
 									checked={value === opt.id}
 									onChange={() => onChange(field.qid, opt.id)}
-									className="accent-geist-blue"
+									className="accent-[#000000]"
 								/>
 								<span className="text-sm text-text-primary">{opt.label?.[language]}</span>
 							</label>
@@ -33,7 +33,7 @@ export default function DynamicField({ field, value, onChange, language }) {
 					<p className="font-medium text-[15px] text-text-primary">{field.text?.[language]}</p>
 					<input
 						type="text"
-						className="w-full bg-bg border border-border text-text-primary rounded-md px-3 py-2 text-sm outline-none focus:border-geist-blue focus:ring-1 focus:ring-geist-blue/20 transition-all"
+						className="w-full bg-white border border-[#E5E5E5] text-text-primary rounded-md px-3 py-2 text-sm outline-none focus:border-black focus:ring-1 focus:ring-black hover:border-[#A3A3A3] transition-all"
 						value={value || ""}
 						onChange={(e) => onChange(field.qid, e.target.value)}
 					/>
@@ -52,8 +52,8 @@ export default function DynamicField({ field, value, onChange, language }) {
 							return (
 								<label
 									key={opt.id}
-									className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors
-                ${selectedValues.includes(opt.id) ? "border-geist-blue bg-geist-blue/10" : "border-border hover:bg-surface-alt"}
+									className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-all
+                ${selectedValues.includes(opt.id) ? "border-black bg-white ring-1 ring-black shadow-sm" : "border-[#E5E5E5] bg-white hover:border-[#A3A3A3]"}
               `}
 								>
 									<input
@@ -70,7 +70,7 @@ export default function DynamicField({ field, value, onChange, language }) {
 
 											onChange(field.qid, updated);
 										}}
-										className="accent-geist-blue"
+										className="accent-[#000000]"
 									/>
 
 									<span className="text-sm text-text-primary">{opt.label?.[language]}</span>
