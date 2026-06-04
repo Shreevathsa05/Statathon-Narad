@@ -1,3 +1,4 @@
+import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import RoleBadge from './RoleBadge.jsx';
@@ -13,7 +14,10 @@ import {
   CheckCircle, 
   Download, 
   Search,
-  LogOut
+  LogOut,
+  Sparkles,
+  Edit,
+  Loader2
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext.jsx';
 
@@ -32,7 +36,9 @@ const NAV = {
   ],
   sdrd: [
     { section: 'SDRD', links: [
-      { to: '/sdrd',        label: 'Survey Builder', icon: ClipboardList },
+      { to: '/sdrd',                 label: 'SDRD Dashboard',        icon: BarChart },
+      { to: '/sdrd/ai-builder',      label: 'AI Survey Builder',     icon: Sparkles },
+      { to: '/sdrd/manual-builder',  label: 'Manual Survey Builder', icon: Edit },
     ]},
   ],
   fod: [
@@ -71,15 +77,22 @@ export default function Sidebar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   if (!user) return null;
 
   const sections = NAV[user.role] || [];
 
   const handleLogout = async () => {
-    await logout();
-    toast.info('You have been logged out');
-    navigate('/login');
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      toast.info('You have been logged out');
+      navigate('/login');
+    } catch (error) {
+      console.error(error);
+      setIsLoggingOut(false);
+    }
   };
 
   return (
@@ -121,10 +134,15 @@ export default function Sidebar() {
         </div>
         <button 
           onClick={handleLogout}
-          className="flex items-center justify-start gap-2 px-2 h-9 w-full rounded-md text-sm font-medium text-geist-error/70 bg-transparent hover:bg-geist-error/10 hover:text-geist-error transition-colors"
+          disabled={isLoggingOut}
+          className="flex items-center justify-start gap-2 px-2 h-9 w-full rounded-md text-sm font-medium text-geist-error/70 bg-transparent hover:bg-geist-error/10 hover:text-geist-error transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <LogOut size={16} className="opacity-70" />
-          Log out
+          {isLoggingOut ? (
+            <Loader2 size={16} className="opacity-70 animate-spin" />
+          ) : (
+            <LogOut size={16} className="opacity-70" />
+          )}
+          {isLoggingOut ? 'Logging out...' : 'Log out'}
         </button>
       </div>
     </nav>

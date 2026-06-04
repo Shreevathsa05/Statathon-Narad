@@ -118,6 +118,20 @@
   100% { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes spin-y {
+  from { transform: rotateY(0deg); }
+  to { transform: rotateY(360deg); }
+}
+
+@keyframes scroll-x {
+  from { transform: translateX(0); }
+  to { transform: translateX(8px); }
+}
+
+.animate-spin-y {
+  animation: spin-y 2s linear infinite;
+}
+
 .animate-user-msg {
   animation: slideUpFromInput 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
@@ -132,4 +146,46 @@
 
 .animate-fade-in-card {
   animation: fadeInCard 0.5s ease-out forwards;
+}
+
+@keyframes blob-wave {
+  0% { border-radius: 16px 32px 32px 16px / 16px 16px 32px 32px; }
+  33% { border-radius: 32px 16px 16px 32px / 32px 32px 16px 16px; }
+  66% { border-radius: 16px 32px 32px 16px / 32px 16px 16px 32px; }
+  100% { border-radius: 16px 32px 32px 16px / 16px 16px 32px 32px; }
+}
+
+/* Audio Visualizer Glow */
+.audio-glow-wrapper {
+  position: relative;
+  z-index: 1;
+}
+
+.audio-glow-wrapper::before {
+  content: "";
+  position: absolute;
+  /* Fixed generous offset so it's guaranteed visible on all sides */
+  top: -8px; left: -8px; right: -8px; bottom: -8px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 1) 0%, rgba(168, 85, 247, 1) 50%, rgba(236, 72, 153, 1) 100%);
+  z-index: -2;
+  
+  /* Wavy organic shape using pixel radii to prevent horizontal pinching */
+  animation: blob-wave 4s linear infinite;
+  
+  /* Brightness based on voice */
+  opacity: calc(0.45 + var(--audio-intensity, 0) * 0.75);
+  
+  /* Blur expands uniformly outward based on voice, without distorting aspect ratio */
+  filter: blur(calc(12px + var(--audio-intensity, 0) * 22px));
+  
+  transition: opacity 0.05s ease, filter 0.05s ease;
+}
+
+.audio-glow-wrapper::after {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  border-radius: inherit;
+  background-color: var(--color-bg);
+  z-index: -1;
 }

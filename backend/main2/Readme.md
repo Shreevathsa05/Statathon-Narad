@@ -374,6 +374,44 @@ The API routes are prefixed by `/api`.
     ```
   - `404 Not Found`: "Survey not found"
 
+## 🔒 Auth Routes
+**Base:** `/api/auth`
+
+- `POST /api/auth/check-email`: Verifies if an email exists and its setup status.
+- `POST /api/auth/setup-password`: Allows an invited user to set their password.
+- `POST /api/auth/login`: Authenticates a user and returns JWT access/refresh tokens via HTTP-only cookies.
+- `GET /api/auth/refresh`: Issues a new access token using a valid refresh token.
+- `POST /api/auth/logout`: Clears the authentication cookies.
+- `GET /api/auth/me`: Retrieves the currently authenticated user's profile.
+- `POST /api/auth/start/:surveyId`: Initiates citizen survey authentication.
+- `POST /api/auth/complete/:surveyId`: Completes citizen survey authentication.
+
+---
+
+## 👥 User Routes (Admin/FOD)
+**Base:** `/api/user`
+
+- `POST /api/user/invite`: Invites a new user (Admin/FOD only).
+- `GET /api/user/`: Lists all users.
+- `GET /api/user/:id`: Retrieves a specific user's details.
+- `PATCH /api/user/:id/suspend`: Suspends or activates a user.
+- `DELETE /api/user/:id`: Deletes a user.
+
+---
+
+## 🎯 Campaign Routes
+**Base:** `/api/campaign`
+
+- `POST /api/campaign/upload/:surveyId`: Uploads an Excel file containing target contacts for a campaign.
+- `POST /api/campaign/generate/:surveyId`: AI/Algorithmic generation of campaign targets based on demographic data.
+
+---
+
+## 📊 Demographic Routes
+**Base:** `/api/demographic`
+
+- `GET /api/demographic/lookup`: Looks up demographic data (e.g. by LGD code) for survey segmentation and targeting.
+
 ---
 
 ## 🏗️ Recent Architectural Updates (June 2026)

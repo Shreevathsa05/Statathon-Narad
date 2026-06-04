@@ -4,6 +4,7 @@ import minioClient from "../utils/minio/client.js";
 import stt_from_twilio_whisper, { stt_from_twilio_sarvam } from "../utils/stt.js";
 import { audio_generation } from "../utils/audio_generation.js";
 import { Survey } from "../mongodb/surveySchema.js";
+import { surveyLogs } from "./question_generation_route.js";
 
 const speech_conversion_router = Router();
 
@@ -53,7 +54,7 @@ speech_conversion_router.get("/generate_audio/:surveyId", async (req, res) => {
     const survey = await Survey.findOne({ surveyId: surveyId });
     
     if (!survey) {
-        return res.status(404).send("Survey not found");
+        return res.status(404).json({ error: "Survey not found" });
     }
 
     // Check if audio generation has been completed by checking the first question's audio
@@ -65,14 +66,54 @@ speech_conversion_router.get("/generate_audio/:surveyId", async (req, res) => {
             ? survey.supportedLanguages[0] 
             : "english";
 
-        if (firstQuestion.audio && firstQuestion.audio.get(firstLang)) {
-            return res.send("Audio generation completed");
+        const firstLangAudio = firstQuestion.audio && firstQuestion.audio.get(firstLang);
+        if (firstLangAudio && firstLangAudio.trim() !== "") {
+            return res.json({ status: "completed", message: "Audio generation completed" });
         }
     }
     
     // If not completed, start generation in the background
+    await Survey.findOneAndUpdate({ surveyId }, { $set: { status: "generating_audio" } });
+    surveyLogs.delete(surveyId);
+    
     audio_generation(surveyId);
-    return res.send("Audio generation started");
+    return res.json({ surveyId, status: "generating_audio" });
 })
+
+speech_conversion_router.delete("/delete_audio/:surveyId", async (req, res) => {
+    const surveyId = req.params.surveyId;
+    const survey = await Survey.findOne({ surveyId: surveyId });
+    
+    if (!survey) {
+        return res.status(404).send("Survey not found");
+    }
+
+    let updatesMade = false;
+    // Iterate through all sections and questions to clear the audio maps
+    for (const section of survey.questionSections) {
+        for (const question of section.questions) {
+            if (question.audio) {
+                // For every language that has an audio ID, clear it
+                for (const language of question.audio.keys()) {
+                    // You could also add minioClient.removeObject(...) here if you want to delete the actual files
+                    if (question.audio.get(language).trim() !== "") {
+                        question.audio.set(language, "");
+                        updatesMade = true;
+                    }
+                }
+            }
+        }
+    }
+
+    if (updatesMade) {
+        await Survey.updateOne(
+            { surveyId: surveyId },
+            { $set: { questionSections: survey.questionSections } }
+        );
+        return res.send("All audio IDs have been cleared from the database.");
+    }
+
+    return res.send("No audio IDs were found to delete.");
+});
 
 export default speech_conversion_router;

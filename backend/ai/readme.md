@@ -27,6 +27,9 @@ graph TD
     
     G -.->|Multilang Request| J[Multilingual Translator Agent]
     J -.->|Translates to target languages| K[Multi-lingual Survey stored]
+    
+    K -.->|Audio Request| L[Audio Generation Agent]
+    L -.->|Uploads TTS mp3 to MinIO| M[Survey Audio Ready]
 ```
 
 ---
@@ -250,6 +253,21 @@ The backend exposes **6 main survey routes** (grouped under `/question-generatio
 
 ### 2. Speech Conversion (`/speech`)
 
+#### 🟢 GET `/generate_audio/:surveyId` (Generate TTS)
+* **Description:** Initiates a background process to generate Sarvam AI Text-to-Speech audio for all questions and options across all translated languages in a survey.
+* **Under-the-Hood Logic:**
+  1. Sets survey status to `generating_audio`.
+  2. Background worker fetches survey and translates text into speech.
+  3. Uploads `.mp3` files to a secure MinIO S3 bucket and attaches the URLs to the `audio` map in the MongoDB schema.
+  4. Resets survey status to `pending` upon completion.
+* **Response:**
+  ```json
+  { "surveyId": "uuid", "status": "generating_audio" }
+  ```
+
+#### 🟢 GET `/audio/:surveyId/:audioId` (Serve Audio Proxy)
+* **Description:** Proxies and streams generated `.mp3` files securely from the MinIO storage bucket.
+
 #### 🟢 GET `/` (Health Check)
 * **Response:** `"Speech Generation Route Active"`
 
@@ -321,6 +339,9 @@ Instructs the AI to act as a precise questionnaire editor. It reads instructions
 Orchestrates deep translation into regional target languages while strictly maintaining original English properties inside the localized Maps.
 * **Supported Languages:** `hindi`, `bengali`, `telugu`, `tamil`, `marathi`, `gujarati`, `kannada`, `malayalam`, `odia`, `punjabi`, `urdu`.
 
+### 6. Audio Generation Agent
+Orchestrates background processing of generated translations through Sarvam TTS, formatting the audio into `mp3` and persisting them securely to an S3-compatible MinIO bucket.
+
 ---
 
 ## 💾 MongoDB Database Schemas
@@ -379,6 +400,10 @@ The `.env` configuration determines which model providers and client credentials
 | `MOSPI_MCP_URI` | Address of the MoSPI MCP server (`https://mcp.mospi.gov.in`) |
 | `MONGODB_URI` | Mongo instance address (defaults to `mongodb://localhost:27017`) |
 | `REDIS_URL` | Redis server address (defaults to `redis://localhost:6379`) |
+| `MINIO_ENDPOINT` | IP or hostname of the MinIO S3 audio storage server |
+| `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` | Credentials for MinIO |
+| `TAVILY_API_KEY` | Fallback web search agent API Key |
+| `LANGSMITH_API_KEY` | Tracing API Key |
 
 ---
 
@@ -414,4 +439,7 @@ The server will connect to MongoDB, hook standard events, and begin listening on
 - **Prompt Validation Integration:** Fixed an issue where the `prompt_validation_agent` was not correctly imported into the question generation route. The AI now actively intercepts vague user prompts and successfully returns clarifying follow-up questions before initiating the MoSPI query sequence.
 - **Agentic Logging & Real-time Streaming:** Implemented a lightweight, memory-safe in-memory `surveyLogs` store using ES6 `Map` in the AI backend. This enables LangGraph subagents to emit lifecycle events (Started/Completed) which are streamed to the frontend terminal UI for complete user transparency without exposing raw AI JSON reasoning.
 - **LangGraph Recursion Safety:** Standardized `recursionLimit: 100` across all LangChain/LangGraph agent `.invoke()` calls (`agents.js`). This permanently resolves `GraphRecursionError` crashes that occurred when generating highly complex surveys containing many sections.
-- **Flexible Schema Constraints:** Relaxed the hardcoded maximum option limit on Multiple Choice Questions (MCQs) in `backend/main2/src/models/surveySchema.js` from 5 to 10 options. This accommodates the AI's tendency to generate exhaustive and thorough question choices without failing MongoDB validations.
+- **Backend Stability:** Removed `--watch` flags from dev scripts to prevent server crashes (`ECONNRESET`) during background agent file writes.
+- **Strict Architectural Prompts:** Overhauled the `section_planner_system_prompt` and `question_generator_system_prompt` with aggressive system-level constraints to permanently eliminate duplicate AI-generated "Demographics" sections, replacing error-prone backend programmatic filters.
+- **Agent Reliability (Direct Invocation):** Refactored `prompt_validation_agent` to use direct LLM invocation (`llm_chat.invoke`) instead of the standard Langchain `createAgent` loop, fixing random `JSON.parse` crashes when tools were omitted.
+- **One-Way Schema Architecture:** Clarified that `allowedChannels` and `accessType` do not belong in the AI backend's schema. Since `main2` handles these assignment states and `ai` never pulls active surveys back to overwrite them, omitting them entirely correctly reflects the one-way generation flow.

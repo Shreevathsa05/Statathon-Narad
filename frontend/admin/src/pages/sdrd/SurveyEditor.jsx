@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { surveyClient } from '../../api/survey';
 import { aiClient } from '../../api/aiClient';
-import { ArrowLeft, Sparkles, CheckCircle2, AlertCircle, Save, X, Loader2, Globe, Check, Edit2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Sparkles, CheckCircle2, AlertCircle, Save, X, Loader2, Globe, Check, Edit2, Trash2, Volume2, AudioLines } from 'lucide-react';
 import { useToast } from '../../context/ToastContext.jsx';
 
 const TypewriterMessage = ({ content, isList = false }) => {
@@ -110,6 +110,18 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
   const [improveInstructions, setImproveInstructions] = useState('');
   const [improvingStatus, setImprovingStatus] = useState('idle');
 
+  // Audio Generation & Visualizer state
+  const [audioGenerationStatus, setAudioGenerationStatus] = useState('idle');
+  const [showAudioModal, setShowAudioModal] = useState(false);
+  const [playingAudioId, setPlayingAudioId] = useState(null);
+  
+  const audioCtxRef = React.useRef(null);
+  const analyserRef = React.useRef(null);
+  const sourceNodeRef = React.useRef(null);
+  const audioObjRef = React.useRef(null);
+  const reqAnimRef = React.useRef(null);
+  const activeQuestionRef = React.useRef(null);
+
   // Multi-lang state
   const [showLangPanel, setShowLangPanel] = useState(false);
   const [selectedLangs, setSelectedLangs] = useState([]);
@@ -134,8 +146,21 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
     }
   }, [translateLogs]);
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     const { type, secIdx, qIdx, optIdx } = deleteModal;
+    
+    if (type === 'survey') {
+      setDeleteModal({ show: false });
+      try {
+        await surveyClient.deleteSurvey(surveyId);
+        toast.success("Survey deleted successfully");
+        navigate('/sdrd');
+      } catch (err) {
+        setShowErrorModal("Failed to delete survey: " + err.message);
+      }
+      return;
+    }
+
     const updated = [...localSections];
     if (type === 'section') {
       updated.splice(secIdx, 1);
@@ -158,6 +183,26 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
     fetchSurvey();
   }, [surveyId]);
 
+  const cleanupAudio = () => {
+    if (reqAnimRef.current) cancelAnimationFrame(reqAnimRef.current);
+    if (audioObjRef.current) {
+      audioObjRef.current.pause();
+      audioObjRef.current.src = "";
+    }
+    if (sourceNodeRef.current) {
+      try { sourceNodeRef.current.disconnect(); } catch (e) {}
+      sourceNodeRef.current = null;
+    }
+    setPlayingAudioId(null);
+    if (activeQuestionRef.current) {
+      activeQuestionRef.current.style.setProperty('--audio-intensity', '0');
+    }
+  };
+
+  useEffect(() => {
+    return cleanupAudio;
+  }, []);
+
   const fetchSurvey = async (showLoading = true) => {
     try {
       if (showLoading) setLoading(true);
@@ -176,45 +221,32 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
     }
   };
 
+
+
   useEffect(() => {
     let interval;
-    if (translateStatus === 'processing') {
+    if (audioGenerationStatus === 'processing') {
       interval = setInterval(async () => {
         try {
-          const res = await aiClient.pollQuestionsMultilang(surveyId);
-          if (res.logs) {
-            let filteredLogs = [];
-            let isInsideRawBlock = false;
-            for (const log of res.logs) {
-              if (log.includes('=== RAW MULTILANG TRANSLATOR RESPONSE ===')) {
-                isInsideRawBlock = true;
-                continue;
-              }
-              if (isInsideRawBlock && log.includes('=========================================')) {
-                isInsideRawBlock = false;
-                continue;
-              }
-              if (!isInsideRawBlock) {
-                filteredLogs.push(log);
-              }
-            }
-            setTranslateLogs(filteredLogs);
-          }
-          if (res.status === 'completed') {
+          const res = await surveyClient.getSurveyById(surveyId);
+          const surveyData = res.data.data;
+          const firstLang = surveyData.supportedLanguages?.[0] || 'english';
+          const firstQ = surveyData.questionSections?.[0]?.questions?.[0];
+          
+          if (firstQ?.audio && firstQ.audio[firstLang]) {
             clearInterval(interval);
-            setTranslateStatus('idle');
-            setShowLangPanel(false);
-            setTranslateLogs([]);
-            await fetchSurvey();
-            toast.success("Survey translated successfully");
+            setAudioGenerationStatus('idle');
+            setSurvey(surveyData);
+            setLocalSections(surveyData.questionSections || []);
+            toast.success("Audio generated successfully");
           }
         } catch (err) {
-          console.error("Polling error", err);
+          console.error("Polling error for audio generation", err);
         }
       }, 5000);
     }
     return () => clearInterval(interval);
-  }, [translateStatus, surveyId]);
+  }, [audioGenerationStatus, surveyId]);
 
   const validateSurvey = () => {
     if (!localSections || localSections.length === 0) {
@@ -320,9 +352,98 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
     setTranslateStatus('processing');
     try {
       await aiClient.generateQuestionsMultilang(surveyId, selectedLangs);
+      toast.info("Hold on we are translating this survey for you");
+      navigate('/sdrd');
     } catch (err) {
       setShowErrorModal("Translation initiation failed: " + err.message);
       setTranslateStatus('idle');
+    }
+  };
+
+  const handleGenerateAudio = async () => {
+    setAudioGenerationStatus('processing');
+    setShowAudioModal(false);
+    try {
+      await aiClient.generateAudio(surveyId);
+      toast.info("Hold on we are generating audio for this survey");
+      navigate('/sdrd');
+    } catch (err) {
+      setShowErrorModal("Failed to initiate audio generation: " + err.message);
+      setAudioGenerationStatus('idle');
+    }
+  };
+
+  const playAudio = async (audioId) => {
+    if (!audioId) return;
+
+    if (playingAudioId === audioId && audioObjRef.current) {
+      if (!audioObjRef.current.paused) {
+        audioObjRef.current.pause();
+        if (reqAnimRef.current) cancelAnimationFrame(reqAnimRef.current);
+        if (activeQuestionRef.current) {
+          activeQuestionRef.current.style.setProperty('--audio-intensity', '0');
+        }
+        setPlayingAudioId(null);
+      }
+      return;
+    }
+
+    cleanupAudio();
+    setPlayingAudioId(audioId);
+
+    try {
+      const url = `/speech/audio/${surveyId}/${audioId}`;
+      const audio = new Audio(url);
+      audio.crossOrigin = "anonymous";
+      audioObjRef.current = audio;
+
+      audio.onended = () => {
+        setPlayingAudioId(null);
+        if (reqAnimRef.current) cancelAnimationFrame(reqAnimRef.current);
+        if (activeQuestionRef.current) {
+          activeQuestionRef.current.style.setProperty('--audio-intensity', '0');
+        }
+      };
+
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+        analyserRef.current = audioCtxRef.current.createAnalyser();
+        analyserRef.current.fftSize = 256;
+      }
+      
+      if (audioCtxRef.current.state === 'suspended') {
+        await audioCtxRef.current.resume();
+      }
+
+      sourceNodeRef.current = audioCtxRef.current.createMediaElementSource(audio);
+      sourceNodeRef.current.connect(analyserRef.current);
+      analyserRef.current.connect(audioCtxRef.current.destination);
+
+      await audio.play();
+
+      const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+      const update = () => {
+        if (!analyserRef.current) return;
+        analyserRef.current.getByteFrequencyData(dataArray);
+        
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+          sum += dataArray[i];
+        }
+        const average = sum / dataArray.length;
+        const intensity = (average / 255).toFixed(3);
+
+        if (activeQuestionRef.current) {
+          activeQuestionRef.current.style.setProperty('--audio-intensity', intensity);
+        }
+        
+        reqAnimRef.current = requestAnimationFrame(update);
+      };
+      update();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to play audio");
+      cleanupAudio();
     }
   };
 
@@ -469,22 +590,31 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
 
   const isPending = survey.status === 'pending';
   const hasTranslations = survey.supportedLanguages && survey.supportedLanguages.length > 1;
-  const isTranslationLocked = translateStatus === 'processing' || hasTranslations;
+  const allQuestions = survey?.questionSections?.flatMap(s => s.questions) || [];
+  const hasAudioGenerated = allQuestions.some(q => q.audio && Object.values(q.audio).some(audioStr => audioStr && audioStr.trim() !== ""));
+  const isTranslationLocked = translateStatus === 'processing' || audioGenerationStatus === 'processing' || hasTranslations || hasAudioGenerated;
 
   return (
     <div className="flex flex-col flex-1 min-w-0 bg-bg">
-      <div className="flex flex-col flex-1 w-full max-w-[1200px] mx-auto px-6 pb-16">
-      
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-start justify-between py-6 mb-6 border-b border-border bg-bg sticky top-0 z-10 gap-6">
-        <div className="flex-1 min-w-0">
+      {/* Sticky Header for Back Button */}
+      <div className="bg-bg border-b border-border">
+        {/* Full-width container for the back button */}
+        <div className="w-full px-8 pt-6 pb-2">
           <button 
-            className="inline-flex items-center gap-2 text-sm font-medium text-text-muted hover:text-text-primary mb-2 transition-colors"
+            className="inline-flex items-center gap-2 text-sm font-medium text-text-muted hover:text-text-primary transition-colors"
             onClick={() => navigate('/sdrd')}
           >
             <ArrowLeft size={16} /> Back to Dashboard
           </button>
-          {isEditingTitle ? (
+        </div>
+      </div>
+        
+      {/* Top Bar with Title and Actions */}
+      <div className="w-full bg-surface border-b border-border pt-6 pb-6 sticky top-0 z-[40]">
+        {/* Constrained container for Title and Actions */}
+        <div className="w-full max-w-[1200px] mx-auto px-6 flex flex-col lg:flex-row lg:items-start justify-between gap-6">
+          <div className="flex-1 min-w-0">
+            {isEditingTitle ? (
             <div className="flex items-center gap-3 mb-2 w-full max-w-[800px]">
               <input 
                 type="text"
@@ -529,15 +659,27 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
         </div>
 
         {isPending && (
-          <div className="flex items-center gap-3 shrink-0 lg:pt-7">
+          <div className="flex items-center gap-3 shrink-0">
             {hasChanges && (
-              <button className="inline-flex items-center justify-center gap-2 px-4 h-9 text-sm font-medium rounded-md bg-white border border-border text-text-primary hover:bg-surface-alt transition-colors disabled:opacity-50 shrink-0 whitespace-nowrap" onClick={handleManualSave} disabled={saving || translateStatus === 'processing'}>
+              <button className="inline-flex items-center justify-center gap-2 px-4 h-9 text-sm font-medium rounded-md bg-white border border-border text-text-primary hover:bg-surface-alt transition-colors disabled:opacity-50 shrink-0 whitespace-nowrap" onClick={handleManualSave} disabled={saving || translateStatus === 'processing' || hasAudioGenerated} title={hasAudioGenerated ? "Survey is locked after audio generation" : ""}>
                 {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                 Save Draft
               </button>
             )}
-            <button className="inline-flex items-center justify-center gap-2 px-4 h-9 text-sm font-medium rounded-md bg-white border border-border text-text-primary hover:bg-surface-alt transition-colors disabled:opacity-50 shrink-0 whitespace-nowrap" onClick={() => setShowLangPanel(!showLangPanel)} disabled={translateStatus === 'processing'}>
+            <button 
+              className="inline-flex items-center justify-center gap-2 px-4 h-9 text-sm font-medium rounded-md bg-white border border-border text-text-primary hover:bg-surface-alt transition-colors disabled:opacity-50 shrink-0 whitespace-nowrap" 
+              onClick={() => setShowAudioModal(true)} 
+              disabled={audioGenerationStatus === 'processing' || translateStatus === 'processing' || hasAudioGenerated}
+              title={hasAudioGenerated ? "Survey is locked after audio generation" : ""}
+            >
+              {audioGenerationStatus === 'processing' ? <Loader2 size={16} className="animate-spin" /> : <AudioLines size={16} />}
+              Generate Audio
+            </button>
+            <button className="inline-flex items-center justify-center gap-2 px-4 h-9 text-sm font-medium rounded-md bg-white border border-border text-text-primary hover:bg-surface-alt transition-colors disabled:opacity-50 shrink-0 whitespace-nowrap" onClick={() => setShowLangPanel(!showLangPanel)} disabled={translateStatus === 'processing' || audioGenerationStatus === 'processing' || hasAudioGenerated} title={hasAudioGenerated ? "Survey is locked after audio generation" : ""}>
               <Globe size={16} /> Translate
+            </button>
+            <button className="inline-flex items-center justify-center gap-2 px-4 h-9 text-sm font-medium rounded-md bg-white border border-geist-error text-geist-error hover:bg-geist-error/10 transition-colors disabled:opacity-50 shrink-0 whitespace-nowrap" onClick={() => setDeleteModal({ show: true, type: 'survey', message: 'Are you sure you want to delete this entire survey? This action cannot be undone.' })} disabled={translateStatus === 'processing' || audioGenerationStatus === 'processing'}>
+              <Trash2 size={16} /> Delete Survey
             </button>
             <button className="inline-flex items-center justify-center gap-2 px-4 h-9 text-sm font-medium rounded-md bg-black text-white hover:bg-neutral-800 transition-colors disabled:opacity-50 shrink-0 whitespace-nowrap" onClick={() => setShowApproveModal(true)} disabled={approving || translateStatus === 'processing'}>
               {approving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
@@ -547,7 +689,10 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
         )}
       </div>
 
-      {/* Translation Panel */}
+      {/* Main Content */}
+      <div className="flex flex-col flex-1 w-full max-w-[1200px] mx-auto px-6 pb-16 pt-6">
+      
+      {/* Language Translation Panel */}
       {showLangPanel && (
         <div className="bg-surface-alt border border-border rounded-md p-6 mb-8">
           <div className="flex justify-between items-center mb-4">
@@ -589,19 +734,7 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
             </button>
           </div>
           
-          {translateStatus === 'processing' && translateLogs.length > 0 && (
-            <div className="mt-6 w-full bg-white border border-border/60 rounded-md p-3 max-h-28 overflow-y-auto text-[11px] font-mono text-text-muted flex flex-col gap-1 shadow-inner scrollbar-thin" ref={logContainerRef}>
-              {translateLogs.map((log, i) => {
-                const dist = translateLogs.length - 1 - i;
-                const opacity = Math.max(0.3, 1 - dist * 0.25);
-                return (
-                  <div key={i} className="whitespace-pre-wrap transition-opacity duration-500" style={{ opacity }}>
-                    <TypewriterMessage content={log} />
-                  </div>
-                );
-              })}
-            </div>
-          )}
+
         </div>
       )}
 
@@ -648,7 +781,7 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
               
               {isPending && (
                 <div className="flex gap-2">
-                  {sec.sectionName === survey?.questionSections?.[secIdx]?.sectionName && sec.sectionName?.toLowerCase() !== 'user demographics' && (
+                  {sec.sectionName === survey?.questionSections?.[secIdx]?.sectionName && sec.sectionName?.toLowerCase() !== 'demographics' && (
                     <button
                       className="inline-flex items-center gap-1.5 px-2.5 h-7 text-xs font-medium rounded text-geist-blue bg-geist-blue/10 border border-geist-blue/20 hover:bg-geist-blue/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={() => {
@@ -676,7 +809,7 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
                         <Save size={14} /> Save
                       </button>
                     </>
-                  ) : sec.sectionName?.toLowerCase() !== 'user demographics' && (
+                  ) : sec.sectionName?.toLowerCase() !== 'demographics' && (
                     <button
                       className="inline-flex items-center gap-1.5 px-2.5 h-7 text-xs font-medium rounded bg-white border border-border text-text-primary hover:bg-surface-alt transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={() => setEditingSections(prev => ({ ...prev, [secIdx]: true }))}
@@ -735,8 +868,10 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
               </div>
             ) : (
               <div className="px-6 py-2">
-                {sec.questions.map((q, qIdx) => (
-                <div key={q.qid} className={`py-4 ${qIdx === sec.questions.length - 1 ? '' : 'border-b border-border/50'}`}>
+                {sec.questions.map((q, qIdx) => {
+                  const isActiveAudio = playingAudioId && playingAudioId === q.audio?.[viewLang];
+                  return (
+                <div key={q.qid} ref={isActiveAudio ? activeQuestionRef : null} className={`transition-all duration-300 ${isActiveAudio ? 'audio-glow-wrapper bg-bg shadow-sm rounded-md p-4 -mx-4 my-2 border border-transparent' : `py-4 ${qIdx === sec.questions.length - 1 ? '' : 'border-b border-border/50'}`}`}>
                   
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-text-muted text-xs font-bold w-8">Q{qIdx+1}.</span>
@@ -779,8 +914,15 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
                       className="w-full bg-transparent border border-dashed border-transparent focus:border-border hover:border-border text-text-primary text-base font-medium p-1 ml-9 outline-none transition-colors rounded-sm"
                     />
                   ) : (
-                    <div className="ml-10 text-base font-medium text-text-primary py-1">
-                      {q.text?.[viewLang] || q.text?.english}
+                    <div className="ml-10 flex items-center gap-3 py-1">
+                      <span className="text-base font-medium text-text-primary">
+                        {q.text?.[viewLang] || q.text?.english}
+                      </span>
+                      {q.audio && q.audio[viewLang] && q.audio[viewLang].trim() !== "" && (
+                        <button onClick={() => playAudio(q.audio[viewLang])} className={`transition-colors ${playingAudioId === q.audio[viewLang] ? 'text-geist-blue hover:text-blue-600' : 'text-text-muted hover:text-text-primary'}`} title="Play audio">
+                          <Volume2 size={18} />
+                        </button>
+                      )}
                     </div>
                   )}
 
@@ -818,7 +960,7 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
                     </div>
                   )}
                 </div>
-              ))}
+              )})}
               
               {isPending && editingSections[secIdx] && (
                 <div className="py-4 mt-2 border-t border-border/50">
@@ -853,6 +995,27 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
         )}
       </div>
       </div>
+
+      {/* Audio Generation Confirmation Modal */}
+      {showAudioModal && (
+        <div className="fixed inset-0 w-screen h-screen bg-black/40 backdrop-blur-sm flex items-center justify-center z-[1000]" onClick={() => setShowAudioModal(false)}>
+          <div className="bg-bg border border-border rounded-md shadow-lg w-full max-w-[480px] flex flex-col animate-[modalIn_0.2s_ease-out]" onClick={e => e.stopPropagation()}>
+            <div className="p-5 border-b border-border flex items-center justify-between">
+              <h2 className="text-lg font-semibold m-0 text-text-primary">Generate Audio</h2>
+              <button className="inline-flex items-center justify-center w-8 h-8 rounded text-text-muted hover:bg-surface hover:text-text-primary transition-colors" onClick={() => setShowAudioModal(false)}><X size={16} /></button>
+            </div>
+            <div className="p-5">
+              <p className="m-0 text-sm text-text-secondary">
+                Are you sure you want to generate audio? The audio will be generated for these languages: <span className="font-medium text-text-primary capitalize">{survey?.supportedLanguages?.join(', ') || 'English'}</span>.
+              </p>
+            </div>
+            <div className="px-5 py-3 border-t border-border bg-surface-alt rounded-b-md flex items-center justify-end gap-3">
+              <button className="inline-flex items-center justify-center px-4 h-9 text-sm font-medium rounded-md bg-white border border-border text-text-primary hover:bg-surface transition-colors" onClick={() => setShowAudioModal(false)}>Cancel</button>
+              <button className="inline-flex items-center justify-center px-4 h-9 text-sm font-medium rounded-md bg-black text-white hover:bg-neutral-800 transition-colors" onClick={handleGenerateAudio}>Generate</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Approve Survey Modal */}
       {showApproveModal && (
@@ -918,6 +1081,7 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
         </div>
       )}
 
+      </div>
     </div>
   );
 }

@@ -28,7 +28,7 @@ export default function ManualBuilder() {
         categories: category ? [category] : ['General'],
         questionSections: [
           {
-            sectionName: "User Demographics",
+            sectionName: "Demographics",
             questions: [
               {
                   qid: "fullname",
@@ -104,15 +104,19 @@ export default function ManualBuilder() {
   };
 
   return (
-    <div className="flex flex-col flex-1 min-w-0 bg-bg px-6 pt-6 pb-16 mx-auto w-full max-w-[1200px]">
-      <button 
-        className="inline-flex items-center gap-2 text-sm font-medium text-text-muted hover:text-text-primary mb-6 transition-colors self-start"
-        onClick={() => navigate('/sdrd')}
-      >
-        <ArrowLeft size={16} /> Back to Dashboard
-      </button>
+    <div className="flex flex-col flex-1 min-w-0 bg-bg">
+      {/* Full-width container for the back button */}
+      <div className="w-full px-8 pt-6 pb-2">
+        <button 
+          className="inline-flex items-center gap-2 text-sm font-medium text-text-muted hover:text-text-primary mb-6 transition-colors self-start"
+          onClick={() => navigate('/sdrd')}
+        >
+          <ArrowLeft size={16} /> Back to Dashboard
+        </button>
+      </div>
 
-      <div className="max-w-[65ch] mx-auto w-full">
+      <div className="flex flex-col flex-1 px-6 pb-16 mx-auto w-full max-w-[1200px]">
+        <div className="max-w-[65ch] mx-auto w-full">
         <h1 className="text-2xl font-bold tracking-tight text-text-primary mb-8">
           Manual Survey Builder
         </h1>
@@ -168,6 +172,7 @@ export default function ManualBuilder() {
           </div>
 
         </form>
+      </div>
       </div>
     </div>
   );
