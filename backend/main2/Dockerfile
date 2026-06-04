@@ -1,20 +1,27 @@
-# Use Node.js 22 LTS base image
-FROM node:22
+# Use official Node.js runtime as base image
+FROM node:20-alpine
 
-# Set working directory inside the container
+# Set working directory in container
 WORKDIR /app
 
-# Copy package.json and package-lock.json (if available)
+# Copy package.json and package-lock.json (if exists)
 COPY package*.json ./
 
 # Install dependencies
-RUN npm install --peer-deps
+RUN npm i
 
-# Copy the rest of the app code
+# Copy the rest of the application code
 COPY . .
 
-# Expose app port (customize this if needed)
+# Expose port (default 3000, can be overridden)
 EXPOSE 3000
 
-# Start the app
+# Set environment to production
+ENV NODE_ENV=production
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:' + (process.env.PORT || 3000), (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
+
+# Start the application
 CMD ["node", "src/index.js"]
