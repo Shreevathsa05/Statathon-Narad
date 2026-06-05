@@ -4,9 +4,10 @@ import SurveyPlan from "../mongodb/surveyPlan.js";
 import connectDB from "../mongodb/connect.js";
 import crypto from "crypto";
 import { surveyLogs } from "../router/question_generation_route.js";
+import { logger } from "./logger.js";
 
 function pushLog(id, msg) {
-    console.log(msg);
+    logger.info(msg);
     if (!id) return;
     if (!surveyLogs.has(id)) surveyLogs.set(id, []);
     surveyLogs.get(id).push(msg);
@@ -165,21 +166,21 @@ export async function generate_english_questions(user_input, surveyId, survey_na
         { upsert: true, new: true }
     );
 
-    console.log("Successfully saved to MongoDB");
+    logger.info("Successfully saved to MongoDB");
     return savedSurvey;
 }
 
 export default async function generate_english_questions_retry(user_input, id, survey_name) {
     for (let i = 0; i < 3; i++) {
         try {
-            console.log(`Attempt ${i + 1} for query: ${user_input}`);
+            logger.info(`Attempt ${i + 1} for query: ${user_input}`);
             const survey = await generate_english_questions(user_input, id, survey_name);
             if (survey) {
                 return survey;
             }
             break;
         } catch (error) {
-            console.error("Error in generation loop:", error);
+            logger.error("Error in generation loop:", error);
             continue;
         }
     }

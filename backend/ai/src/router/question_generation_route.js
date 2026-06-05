@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { Survey } from "../mongodb/surveySchema.js";
 import generate_english_questions_retry from "../utils/generate_questions.js";
 import { prompt_validation_agent } from "../models/agents.js";
+import { logger } from "../utils/logger.js";
 
 // In-memory store for real-time generation logs
 export const surveyLogs = new Map();
@@ -19,6 +20,7 @@ question_generation_router.post('/generate_questions_english', async (req, res) 
     const { survey_name, user_query, improved_answers } = req.body;
 
     if (!user_query) {
+        logger.error("user_query is required")
         return res.status(400).json({ error: "user_query is required" });
     }
 
@@ -35,10 +37,10 @@ question_generation_router.post('/generate_questions_english', async (req, res) 
                     });
                 }
             } catch (e) {
-                console.error("Error during prompt validation (proceeding anyway):", e);
+                logger.error("Error during prompt validation (proceeding anyway):", e);
             }
         }
-        
+
         // If it's not vague, or the user already provided improved_answers,
         // we now need the survey title before proceeding.
         return res.json({ status: "needs_title" });
@@ -60,7 +62,7 @@ question_generation_router.post('/generate_questions_english', async (req, res) 
         });
         await initialSurvey.save();
     } catch (e) {
-        console.error("Error creating initial pending survey:", e);
+        logger.error("Error creating initial pending survey:", e);
         return res.status(500).json({ error: "Failed to initialize survey in database" });
     }
 
@@ -71,8 +73,8 @@ question_generation_router.post('/generate_questions_english', async (req, res) 
 
     // Fire and forget - do not await
     generate_english_questions_retry(final_query, surveyId, survey_name)
-        .then(() => console.log(`Generation finished for ${surveyId}`))
-        .catch(err => console.error(`Generation failed for ${surveyId}:`, err));
+        .then(() => logger.info(`Generation finished for ${surveyId}`))
+        .catch(err => logger.error(`Generation failed for ${surveyId}:`, err));
 
     res.json({
         surveyId: surveyId,
@@ -99,7 +101,7 @@ question_generation_router.get('/poll_questions_english/:surveyId', async (req, 
             return res.json({ status: "processing", logs: logs });
         }
     } catch (err) {
-        console.error("Error polling survey:", err);
+        logger.error("Error polling survey:", err);
         return res.status(500).json({ error: "Internal Server Error" });
     }
 });
@@ -126,7 +128,7 @@ question_generation_router.post('/improve_section_english', async (req, res) => 
 
         await improve_english_section(surveyId, sectionName, instructions);
 
-        console.log(`Section ${sectionName} improved for ${surveyId}`);
+        logger.info(`Section ${sectionName} improved for ${surveyId}`);
         // Revert status to pending
         await Survey.findOneAndUpdate({ surveyId }, { $set: { status: "pending" } });
 
@@ -137,7 +139,7 @@ question_generation_router.post('/improve_section_english', async (req, res) => 
         });
 
     } catch (e) {
-        console.error("Error initiating section improvement:", e);
+        logger.error("Error initiating section improvement:", e);
         // Revert status to pending in case of error so it's not stuck
         Survey.findOneAndUpdate({ surveyId }, { $set: { status: "pending" } }).exec();
         return res.status(500).json({ error: "Internal Server Error" });
@@ -162,12 +164,12 @@ question_generation_router.post('/generate_questions_multilang', async (req, res
         // Fire and forget translation
         import("../utils/translate_survey.js").then(({ default: translate_survey }) => {
             translate_survey(surveyId, languages)
-                .then(() => console.log(`Translation finished for ${surveyId}`))
+                .then(() => logger.info(`Translation finished for ${surveyId}`))
                 .catch(err => {
-                    console.error(`Translation failed for ${surveyId}:`, err);
+                    logger.error(`Translation failed for ${surveyId}:`, err);
                 });
         }).catch(err => {
-            console.error("Failed to dynamically import translate_survey:", err);
+            logger.error("Failed to dynamically import translate_survey:", err);
             Survey.findOneAndUpdate({ surveyId }, { $set: { status: "pending" } }).exec();
         });
 
@@ -177,7 +179,7 @@ question_generation_router.post('/generate_questions_multilang', async (req, res
         });
 
     } catch (e) {
-        console.error("Error initiating multilang translation:", e);
+        logger.error("Error initiating multilang translation:", e);
         return res.status(500).json({ error: "Internal Server Error" });
     }
 });
@@ -200,7 +202,7 @@ question_generation_router.get('/poll_questions_multilang/:surveyId', async (req
             return res.json({ status: survey.status, logs: logs });
         }
     } catch (err) {
-        console.error("Error polling multilang survey:", err);
+        logger.error("Error polling multilang survey:", err);
         return res.status(500).json({ error: "Internal Server Error" });
     }
 });
