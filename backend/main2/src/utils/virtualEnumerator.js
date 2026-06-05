@@ -93,6 +93,12 @@ export async function runVirtualEnumerator(surveyId) {
     const flaggedResponses = [];
 
     for (const doc of updatedResponses) {
+        if (doc.isFlagged) {
+            responseHashes.add(hashResponse(doc.response));
+            flaggedResponses.push(doc);
+            continue;
+        }
+
         const flags = [];
         
         // 1. Invalid Data Detection
