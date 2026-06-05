@@ -3,10 +3,11 @@ import connectDB from "../mongodb/connect.js";
 import { b64toMp3, generate_audio } from "./audio_helpers.js";
 import { uploadAudio } from "./minio/file_uploads.js";
 import { surveyLogs } from "../router/question_generation_route.js";
+import { logger } from "./logger.js";
 
 export async function audio_generation(surveyId) {
     const log = (msg) => {
-        console.log(msg);
+        logger.info(msg);
         if (!surveyLogs.has(surveyId)) surveyLogs.set(surveyId, []);
         surveyLogs.get(surveyId).push(msg);
     };
@@ -15,7 +16,7 @@ export async function audio_generation(surveyId) {
 
     let survey = await Survey.findOne({ surveyId: surveyId });
     if (!survey) {
-        console.error("Survey not found!");
+        logger.error("Survey not found!");
         return;
     }
 
@@ -25,7 +26,7 @@ export async function audio_generation(surveyId) {
     let updatesMade = false;
 
     for (const section of survey.questionSections) {
-        console.log(`\n> Processing Section: ${section.sectionName}`);
+        logger.info(`\n> Processing Section: ${section.sectionName}`);
 
         for (const question of section.questions) {
             for (const language of supported_languages) {
@@ -60,7 +61,7 @@ export async function audio_generation(surveyId) {
                 }
 
                 log(`[Audio Task] QID: ${question.qid} | Lang: ${language} -> Generating audio...`);
-                console.log(`[Script]: "${scriptText}"`);
+                logger.info(`[Script]: "${scriptText}"`);
 
                 if (!scriptText || scriptText.trim() === "") {
                     log(`[Audio Task] QID: ${question.qid} | Lang: ${language} -> Script is empty, skipping.`);
@@ -79,14 +80,14 @@ export async function audio_generation(surveyId) {
                     updatesMade = true;
                 } catch (err) {
                     log(`[Audio Task] QID: ${question.qid} | Lang: ${language} -> Generation failed: ${err.message}`);
-                    console.error(err);
+                    logger.error(err);
                 }
             }
         }
     }
 
     if (updatesMade) {
-        console.log("\nSaving survey updates to MongoDB...");
+        logger.info("\nSaving survey updates to MongoDB...");
         await Survey.updateOne(
             { surveyId: surveyId },
             { 

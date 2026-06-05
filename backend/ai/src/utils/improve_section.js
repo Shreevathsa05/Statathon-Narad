@@ -1,10 +1,11 @@
 import { improve_section_agent } from "../models/agents.js";
 import { Survey } from "../mongodb/surveySchema.js";
 import SurveyPlan from "../mongodb/surveyPlan.js";
+import { logger } from "./logger.js";
 
 export default async function improve_english_section(surveyId, sectionName, user_instructions) {
     try {
-        console.log(`Improving section "${sectionName}" for survey: ${surveyId}`);
+        logger.info(`Improving section "${sectionName}" for survey: ${surveyId}`);
 
         // 1. Fetch Survey Plan for Context and Section Description
         const surveyPlan = await SurveyPlan.findOne({ surveyId });
@@ -39,12 +40,12 @@ export default async function improve_english_section(surveyId, sectionName, use
         );
 
         if (!Array.isArray(revised_questions)) {
-            console.warn("Improvement agent did not return a valid array. Falling back to existing questions.");
+            logger.error("Improvement agent did not return a valid array. Falling back to existing questions.");
             revised_questions = current_questions;
         }
 
         // 4. Update the Survey document in MongoDB
-        console.log(`Updating survey ${surveyId} section "${sectionName}" in DB...`);
+        logger.info(`Updating survey ${surveyId} section "${sectionName}" in DB...`);
         const updatedSurvey = await Survey.findOneAndUpdate(
             { 
                 surveyId: surveyId,
@@ -58,11 +59,11 @@ export default async function improve_english_section(surveyId, sectionName, use
             { new: true }
         );
 
-        console.log("Section improvement complete and saved!");
+        logger.info("Section improvement complete and saved!");
         return updatedSurvey;
 
     } catch (error) {
-        console.error("Error improving section:", error);
+        logger.error("Error improving section:", error);
         throw error;
     }
 }
