@@ -4,6 +4,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { SurveyResponse } from "../models/responsesSchema.js";
 import { Survey } from "../models/surveySchema.js";
 import { processResponsePincode } from "../utils/pincodeProcessor.js";
+import { runVirtualEnumerator } from "../utils/virtualEnumerator.js";
 
 export const submitSurveyResponse = asyncHandler(async (req, res) => {
     const { survey_id } = req.params;
@@ -150,4 +151,22 @@ export const getAllSurveyResponseBySurveyId = asyncHandler(async (req, res) => {
     return res.status(200).json(
         new ApiResponse(200, surveyResponse, "successfully fetched survey response")
     );
-})
+});
+
+export const scanAndFetchFlaggedResponses = asyncHandler(async (req, res) => {
+    const { survey_id } = req.params;
+
+    if (!survey_id) {
+        throw new ApiError(400, "Survey id is required");
+    }
+
+    // NOTE: This runs synchronously and waits for all processing to complete.
+    // If response volume scales massively, this will cause API timeouts.
+    // For scale, we will need to implement an async job queue (e.g., Redis/BullMQ)
+    // where this endpoint returns a job ID and the client polls for completion.
+    const flaggedResponses = await runVirtualEnumerator(survey_id);
+
+    return res.status(200).json(
+        new ApiResponse(200, flaggedResponses, "Successfully scanned and fetched flagged responses")
+    );
+});
