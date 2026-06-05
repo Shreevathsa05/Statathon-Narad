@@ -3,6 +3,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { SurveyResponse } from "../models/responsesSchema.js";
 import { Survey } from "../models/surveySchema.js";
+import { processResponsePincode } from "../utils/pincodeProcessor.js";
 
 export const submitSurveyResponse = asyncHandler(async (req, res) => {
     const { survey_id } = req.params;
@@ -120,6 +121,11 @@ export const submitSurveyResponse = asyncHandler(async (req, res) => {
             }
         },
         response
+    });
+
+    // Asynchronous background processing (fire-and-forget)
+    processResponsePincode(surveyResponse._id).catch((err) => {
+        console.error(`[Pincode Processor] Background processing failed for response ${surveyResponse._id}:`, err);
     });
 
     return res.status(201).json(
