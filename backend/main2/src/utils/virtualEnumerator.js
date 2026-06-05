@@ -56,9 +56,171 @@ function hashResponse(responseArray) {
 }
 
 /**
+ * Executes heuristics on a single response document.
+ * Designed to be run asynchronously in the background upon response submission.
+ */
+export async function evaluateSingleResponse(responseId) {
+    const doc = await SurveyResponse.findById(responseId);
+    if (!doc) throw new Error(`SurveyResponse with id '${responseId}' not found.`);
+
+    const survey = await Survey.findById(doc.surveyId);
+    if (!survey) throw new Error(`Survey for response '${responseId}' not found.`);
+
+    const questionMap = new Map();
+    survey.questionSections.forEach(section => {
+        section.questions.forEach(q => questionMap.set(q.qid, q));
+    });
+
+    const flags = [];
+
+    // 1. Invalid Data Detection
+    const loc = doc.paraInfo?.locationInfo || {};
+    if (!loc.districtLGDCode) {
+        flags.push({
+            type: "invalid_data",
+            reason: `Missing LGD Code for provided Pincode: ${loc.pincode || 'None'}`,
+            severity: "high"
+        });
+    }
+
+    // 2. Time Difference
+    if (doc.paraInfo?.interviewInfo) {
+        const start = new Date(doc.paraInfo.interviewInfo.interviewStartTime);
+        const end = new Date(doc.paraInfo.interviewInfo.interviewEndTime);
+        if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+            const diffSeconds = (end.getTime() - start.getTime()) / 1000;
+            const numQuestions = doc.response.length;
+            if (numQuestions > 0) {
+                const secondsPerQuestion = diffSeconds / numQuestions;
+                if (secondsPerQuestion < 2) {
+                    flags.push({
+                        type: "time",
+                        reason: `Unrealistically fast completion time: ${secondsPerQuestion.toFixed(1)} seconds per question`,
+                        severity: "high"
+                    });
+                }
+            }
+        }
+    }
+
+    // 3. Behavioral Fraud Detection - Duplicates
+    const hash = hashResponse(doc.response);
+    const otherDocs = await SurveyResponse.find({ surveyId: doc.surveyId, _id: { $ne: doc._id } });
+    let existingDuplicates = false;
+    for (const other of otherDocs) {
+        if (hashResponse(other.response) === hash) {
+            existingDuplicates = true;
+            break;
+        }
+    }
+
+    if (existingDuplicates) {
+        flags.push({
+            type: "behavioral",
+            reason: `Duplicate Response Array detected across multiple submissions`,
+            severity: "high"
+        });
+    }
+
+    // 4. Behavioral Fraud Detection - Straight-lining & Text Quality & Contextual Anomalies
+    let mcqCount = 0;
+    let lastMcqAnswer = null;
+    let straightLineCount = 0;
+
+    for (const ans of doc.response) {
+        const question = questionMap.get(ans.qid);
+        if (!question) continue;
+
+        const englishText = (question.text?.english || "").toLowerCase();
+        
+        if (question.type === 'mcq') {
+            mcqCount++;
+            if (ans.answer === lastMcqAnswer) {
+                straightLineCount++;
+            } else {
+                lastMcqAnswer = ans.answer;
+                straightLineCount = 1;
+            }
+        }
+
+        if (question.type === 'text' && typeof ans.answer === 'string') {
+            const textAns = ans.answer;
+            
+            if (hasKeyboardSmash(textAns)) {
+                flags.push({
+                    type: "text_quality",
+                    reason: `Keyboard smash detected in question ${ans.qid}: '${textAns}'`,
+                    severity: "high"
+                });
+            }
+
+            const entropy = calculateShannonEntropy(textAns);
+            if (textAns.length > 5 && (entropy < 1.0 || entropy > 4.5)) {
+                flags.push({
+                    type: "text_quality",
+                    reason: `Unnatural character entropy (${entropy.toFixed(2)}) in question ${ans.qid}`,
+                    severity: "medium"
+                });
+            }
+
+            if (englishText.includes("age") && !isNaN(textAns)) {
+                const age = parseInt(textAns);
+                if (age < 0 || age > 120) {
+                    flags.push({
+                        type: "invalid_data",
+                        reason: `Age value is out of bounds (${age}) for question ${ans.qid}`,
+                        severity: "high"
+                    });
+                }
+            }
+
+            if (englishText.includes("name") || ans.qid.toLowerCase().includes("name")) {
+                if (textAns.length <= 2) {
+                    flags.push({
+                        type: "invalid_data",
+                        reason: `Name length is impossibly short (${textAns.length} chars) for question ${ans.qid}`,
+                        severity: "high"
+                    });
+                }
+            }
+            
+            if (textAns.length > 4) {
+                const ratio = getPlausibleWordRatio(textAns);
+                if (ratio === 0 || ratio > 4) {
+                    flags.push({
+                        type: "text_quality",
+                        reason: `Gibberish detected (vowel-consonant ratio ${ratio.toFixed(2)}) in question ${ans.qid}`,
+                        severity: "medium"
+                    });
+                }
+            }
+        }
+    }
+
+    if (straightLineCount >= 5) {
+        flags.push({
+            type: "behavioral",
+            reason: `Straight-Lining detected: 5 or more consecutive identical MCQ option choices`,
+            severity: "high"
+        });
+    }
+
+    // Save flags
+    doc.flags = flags;
+    doc.isFlagged = flags.length > 0;
+    await doc.save();
+    
+    if (doc.isFlagged) {
+        console.log(`⚠️ Flagged ID: ${doc._id} | Flags: ${flags.map(f => f.type).join(', ')}`);
+    }
+
+    return doc;
+}
+
+/**
  * Executes the Virtual Enumerator scanning process.
- * NOTE: This runs synchronously and waits for all processing to complete.
- * For massive scale, this should be redesigned into an async job queue.
+ * NOTE: This is now a legacy manual bulk scanner for terminal usage.
+ * Real-time responses use evaluateSingleResponse instead.
  */
 export async function runVirtualEnumerator(surveyId) {
     const survey = await Survey.findOne({ surveyId: surveyId });
