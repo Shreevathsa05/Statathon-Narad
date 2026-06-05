@@ -7,6 +7,7 @@ import { getNextQuestionIndex, shouldShowQuestion } from "../services/skipLogic.
 import { sendTextMessage, sendInteractiveButtons, sendInteractiveList } from "../utils/whatsappHelper.js";
 import { SurveyResponse } from "../models/SurveyResponse.js";
 import { Survey } from "../models/Survey.js";
+import { CampaignTarget } from "../models/CampaignTarget.js";
 
 /**
  * Handle verification of the webhook by WhatsApp Cloud API (GET request).
@@ -64,23 +65,33 @@ const askQuestion = async (userPhone, question, lang = "english", currentSelecti
     }));
 
     if (formattedOptions.length === 0) {
-      return await sendTextMessage(userPhone, qText);
+      return await sendInteractiveButtons(userPhone, qText, [{ id: "EXIT_SURVEY", title: "Exit Survey" }]);
     }
 
-    if (formattedOptions.length <= 3) {
-      // Send Quick Reply Buttons
+    if (formattedOptions.length <= 2) {
+      // Send Quick Reply Buttons (including Exit Survey button, total <= 3)
+      formattedOptions.push({
+        id: "EXIT_SURVEY",
+        title: "Exit Survey"
+      });
       return await sendInteractiveButtons(userPhone, qText, formattedOptions);
     } else {
-      // Send Interactive List Message
+      // Send Interactive List Message with Exit Survey row at the end
+      const listRows = formattedOptions.map(opt => ({
+        id: opt.id,
+        title: opt.title
+      }));
+      listRows.push({
+        id: "EXIT_SURVEY",
+        title: "❌ Exit Survey",
+        description: "Exit the current survey"
+      });
       return await sendInteractiveList(
         userPhone,
         qText,
         "Select Option",
         "Options",
-        formattedOptions.map(opt => ({
-          id: opt.id,
-          title: opt.title
-        }))
+        listRows
       );
     }
   }
@@ -105,6 +116,13 @@ const askQuestion = async (userPhone, question, lang = "english", currentSelecti
       description: "Click to save all selections and continue"
     });
 
+    // Add Exit Survey option
+    rows.push({
+      id: "EXIT_SURVEY",
+      title: "❌ Exit Survey",
+      description: "Exit the current survey"
+    });
+
     const activeSelectionsStr = currentSelections.length > 0 
       ? `\n\n(Current Selections: ${currentSelections.join(", ")})` 
       : "";
@@ -119,7 +137,220 @@ const askQuestion = async (userPhone, question, lang = "english", currentSelecti
   }
 
   // 3. Text or general inputs
-  return await sendTextMessage(userPhone, qText);
+  return await sendInteractiveButtons(userPhone, qText, [{ id: "EXIT_SURVEY", title: "Exit Survey" }]);
+};
+
+/**
+ * Prompt the user to select the language they want to attempt the survey in.
+ */
+const promptLanguageSelection = async (userPhone, session, survey) => {
+  const supported = survey.supportedLanguages || [];
+
+  if (supported.length <= 1) {
+    session.surveyLanguage = supported[0] || "english";
+    session.surveyId = survey.surveyId;
+    await session.save();
+    await startSelectedSurvey(userPhone, session, survey);
+    return;
+  }
+
+  // Save the surveyId and transition state to language_selection
+  session.surveyId = survey.surveyId;
+  session.currentState = "language_selection";
+  await session.save();
+
+  // Present language choices using quick reply buttons or list
+  const formattedLanguages = supported.map(lang => {
+    // Capitalize for title display
+    const title = lang.charAt(0).toUpperCase() + lang.slice(1);
+    return {
+      id: `SELECT_LANG_${lang.toLowerCase()}`,
+      title: title
+    };
+  });
+
+  if (formattedLanguages.length <= 3) {
+    await sendInteractiveButtons(
+      userPhone,
+      `Please select your preferred language to attempt the survey "${survey.name}":`,
+      formattedLanguages
+    );
+  } else {
+    await sendInteractiveList(
+      userPhone,
+      `Please select your preferred language to attempt the survey "${survey.name}":`,
+      "Select Language",
+      "Languages Available",
+      formattedLanguages.map(opt => ({
+        id: opt.id,
+        title: opt.title
+      }))
+    );
+  }
+};
+
+/**
+ * Starts a selected survey for the user.
+ * Initializes the session, sets up the response document, pre-fills demographics, and asks the first question.
+ */
+const startSelectedSurvey = async (userPhone, session, survey) => {
+  session.surveyId = survey.surveyId;
+  session.currentState = "survey_questions";
+  session.answers = new Map();
+  await session.save();
+
+  // Initialize SurveyResponse
+  const surveyDoc = await Survey.findOne({ surveyId: survey.surveyId });
+  if (surveyDoc) {
+    await SurveyResponse.findOneAndUpdate(
+      { surveyId: surveyDoc._id, respondent: userPhone, status: "in_progress" },
+      {
+        $setOnInsert: {
+          startedAt: new Date(),
+          answers: {},
+          response: [],
+          paraInfo: {
+            deviceInfo: { os: "whatsapp" },
+            interviewInfo: {
+              interviewMode: "whatsapp",
+              interviewStartTime: new Date()
+            }
+          }
+        }
+      },
+      { upsert: true, new: true }
+    );
+  }
+
+  // Prefill demographics
+  const profile = await lookupRespondent(userPhone);
+  const flatQuestions = getFlatQuestions(survey);
+
+  if (profile) {
+    console.log(`[Demographics Prefill] Found demographics profile for ${userPhone}. Prefilling...`);
+    const demoQuestions = flatQuestions.filter(q => q.sectionName === "Demographics");
+    demoQuestions.forEach(q => {
+      let val = "";
+      if (q.qid === "fullname" || q.qid === "fullName") val = profile.fullname;
+      else if (q.qid === "age") val = profile.age;
+      else if (q.qid === "gender") val = profile.gender;
+      else if (q.qid === "primarylanguage" || q.qid === "primaryLanguage") val = profile.primarylanguage;
+      else if (q.qid === "pincode") val = profile.pincode;
+      else if (q.qid === "area") val = profile.area;
+      else if (q.qid === "education") val = profile.education;
+      else if (q.qid === "occupation") val = profile.occupation;
+
+      if (val) {
+        session.answers.set(q.qid, val);
+      }
+    });
+    await session.save();
+
+    // Prefill pincode location codes in paradata if pincode is present
+    if (profile.pincode) {
+      try {
+        const locDetails = await resolveLocationByPincode(profile.pincode);
+        if (surveyDoc) {
+          await SurveyResponse.findOneAndUpdate(
+            { surveyId: surveyDoc._id, respondent: userPhone, status: "in_progress" },
+            {
+              $set: {
+                "paraInfo.locationInfo": {
+                  pincode: profile.pincode,
+                  state: locDetails.state,
+                  district: locDetails.district,
+                  blockName: locDetails.block,
+                  village: locDetails.village,
+                  stateLGDCode: locDetails.lgdStateCode,
+                  districtLGDCode: locDetails.lgdDistrictCode
+                }
+              }
+            }
+          );
+        }
+      } catch (err) {
+        console.warn(`[Demographics Prefill] Failed to resolve prefilled pincode ${profile.pincode}:`, err.message);
+      }
+    }
+  }
+
+  // Get next unanswered question index
+  const nextIdx = getNextQuestionIndex(flatQuestions, 0, session.answers);
+
+  if (nextIdx === -1) {
+    session.currentState = "completed";
+    await session.save();
+    await triggerCompletionFlow(session, survey);
+    return;
+  }
+
+  session.currentQuestionIndex = nextIdx;
+  const nextQ = flatQuestions[nextIdx];
+  session.currentQuestionId = nextQ.qid;
+  await session.save();
+
+  // Send a welcome greeting
+  await sendTextMessage(userPhone, `Welcome to the survey: "${survey.name}".`);
+
+  // Ask the first question
+  await askQuestion(userPhone, nextQ, session.surveyLanguage);
+};
+
+/**
+ * Resolves the surveys eligible for the user and presents them as a list menu,
+ * or starts the survey immediately if only one is available.
+ */
+const presentSurveysList = async (userPhone, session) => {
+  const activeSurveys = await Survey.find({ status: "active" });
+
+  // Get campaign target details for this user to check whitelist eligibility
+  const cleanPhone = userPhone.replace(/\D/g, "");
+  const phoneVariants = [cleanPhone, cleanPhone.substring(2), `+${cleanPhone}`, `+${cleanPhone.substring(2)}`].filter(Boolean);
+  const campaigns = await CampaignTarget.find({ phone: { $in: phoneVariants } });
+  const targetedSurveyIds = campaigns.map(c => c.surveyId.toString());
+
+  // Filter surveys: general surveys + targeted surveys if whitelisted
+  const allowedSurveys = activeSurveys.filter(survey => {
+    if (survey.accessType === "targeted") {
+      return targetedSurveyIds.includes(survey._id.toString());
+    }
+    return true; // general or null
+  });
+
+  console.log(`[Surveys Filter] User: ${userPhone}, Allowed Surveys: ${allowedSurveys.map(s => s.surveyId).join(", ")}`);
+
+  // If a specific survey was requested in the invitation campaign
+  if (session.surveyId && session.surveyId !== "pending") {
+    const matchedSurvey = allowedSurveys.find(s => s.surveyId === session.surveyId);
+    if (matchedSurvey) {
+      await startSelectedSurvey(userPhone, session, matchedSurvey);
+      return;
+    }
+  }
+
+  if (allowedSurveys.length === 0) {
+    await sendTextMessage(userPhone, "There are no active surveys available for you at this time. Thank you.");
+    await deleteSession(userPhone);
+    return;
+  }
+
+  // Present menu for the surveys (even if there is only 1)
+  const rows = allowedSurveys.map(s => ({
+    id: `SELECT_SURVEY_${s.surveyId}`,
+    title: s.name.substring(0, 24),
+    description: s.categories?.join(", ") || ""
+  }));
+
+  session.currentState = "survey_selection";
+  await session.save();
+
+  await sendInteractiveList(
+    userPhone,
+    "Welcome to the MoSPI NARAD Survey Platform. Please select one of the available active surveys to begin:",
+    "Select Survey",
+    "Active Surveys",
+    rows
+  );
 };
 
 /**
@@ -150,76 +381,115 @@ export const handleIncomingMessage = async (req, res) => {
     // Fetch active session
     let session = await getSession(userPhone);
 
-    // --- STATE 1: SURVEY SELECTION / INVITATION (NO ACTIVE SESSION) ---
-    if (!session) {
-      // Check if starting a specific survey from template invitation
-      if (interactivePayload.startsWith("START_SURVEY_")) {
-        const surveyId = interactivePayload.replace("START_SURVEY_", "");
-        const survey = await getSurveyById(surveyId);
-        if (!survey || survey.status !== "active") {
-          await sendTextMessage(userPhone, "This survey is no longer active. Thank you for your interest.");
-          return res.sendStatus(200);
-        }
+    // --- CHECK EXIT REQUESTS ---
+    const isExitRequest = 
+      interactivePayload === "EXIT_SURVEY" || 
+      messageText.toLowerCase() === "exit" || 
+      messageText.toLowerCase() === "exit survey" || 
+      messageText.toLowerCase() === "quit";
 
-        session = await createSession(userPhone, surveyId);
-        await sendTextMessage(userPhone, `Welcome to the survey: "${survey.name}".\n\nPlease enter your phone number to verify your identity:`);
-        return res.sendStatus(200);
-      }
-
-      // Check if starting any active survey
-      const activeSurveys = await getActiveSurveys();
-      if (activeSurveys.length === 0) {
-        await sendTextMessage(userPhone, "There are no active surveys available at this time. Thank you.");
-        return res.sendStatus(200);
-      }
-
-      if (activeSurveys.length === 1) {
-        const survey = activeSurveys[0];
-        session = await createSession(userPhone, survey.surveyId);
-        await sendTextMessage(userPhone, `Welcome to the survey: "${survey.name}".\n\nPlease enter your phone number to verify your identity:`);
-        return res.sendStatus(200);
-      }
-
-      // If multiple active surveys, present list
-      const rows = activeSurveys.map(s => ({
-        id: `SELECT_SURVEY_${s.surveyId}`,
-        title: s.name.substring(0, 24),
-        description: s.categories?.join(", ") || ""
-      }));
-
-      await sendInteractiveList(
-        userPhone,
-        "Welcome to the MoSPI NARAD Survey Platform. Please select one of the active surveys to begin:",
-        "Select Survey",
-        "Active Surveys",
-        rows
-      );
-
-      // Create a temporary session in survey_selection state
-      await SurveySession.create({
-        userPhone,
-        surveyId: "pending",
-        currentState: "survey_selection"
-      });
-
+    if (session && isExitRequest) {
+      const survey = session.surveyId ? await getSurveyById(session.surveyId) : null;
+      await triggerExitFlow(session, survey);
       return res.sendStatus(200);
     }
 
-    // --- RESUME SESSION IN STATE survey_selection ---
+    // --- CASE 1: NO ACTIVE SESSION -> SEND OTP IMMEDIATELY ---
+    if (!session) {
+      let targetSurveyId = "pending";
+      if (interactivePayload.startsWith("START_SURVEY_")) {
+        targetSurveyId = interactivePayload.replace("START_SURVEY_", "");
+      }
+
+      session = await createSession(userPhone, targetSurveyId);
+      session.currentState = "otp_sent";
+      await session.save();
+
+      // Trigger Exotel OTP service
+      await sendOtp(userPhone);
+      await sendTextMessage(
+        userPhone,
+        `Welcome to the MoSPI NARAD Survey Platform. We have sent a 6-digit verification code to your phone number (+${userPhone}) to verify your identity. Please enter the code below (or type "RESEND" to try again):`
+      );
+      return res.sendStatus(200);
+    }
+
+    // --- CASE 2: OTP VERIFICATION ---
+    if (session.currentState === "otp_sent") {
+      const enteredCode = messageText.trim();
+
+      if (enteredCode.toLowerCase() === "resend") {
+        await sendOtp(userPhone);
+        await sendTextMessage(userPhone, `OTP code resent to +${userPhone}. Please enter the code:`);
+        return res.sendStatus(200);
+      }
+
+      const verified = await verifyOtp(userPhone, enteredCode);
+      if (!verified) {
+        await sendTextMessage(userPhone, "⚠️ Invalid or expired code. Please enter the correct code, or reply 'RESEND':");
+        return res.sendStatus(200);
+      }
+
+      // OTP verified successfully!
+      session.verificationStatus = "verified";
+      await session.save();
+      await sendTextMessage(userPhone, "✅ Identity verified successfully!");
+
+      // Resolve eligible surveys and present list or start the single survey
+      await presentSurveysList(userPhone, session);
+      return res.sendStatus(200);
+    }
+
+    // --- CASE 3: SURVEY SELECTION ---
     if (session.currentState === "survey_selection") {
       if (interactivePayload.startsWith("SELECT_SURVEY_")) {
         const surveyId = interactivePayload.replace("SELECT_SURVEY_", "");
         const survey = await getSurveyById(surveyId);
-        if (!survey) {
-          await sendTextMessage(userPhone, "Invalid survey selection. Please try again.");
+        if (!survey || survey.status !== "active") {
+          await sendTextMessage(userPhone, "Selected survey is not active or not found. Please select a survey from the menu list.");
+          return res.sendStatus(200);
+        }
+        await startSelectedSurvey(userPhone, session, survey);
+      } else {
+        await sendTextMessage(userPhone, "Please select a survey from the menu list above.");
+      }
+      return res.sendStatus(200);
+    }
+
+    // --- CASE 3.5: LANGUAGE SELECTION ---
+    if (session.currentState === "language_selection") {
+      let selectedLang = "";
+      if (interactivePayload.startsWith("SELECT_LANG_")) {
+        selectedLang = interactivePayload.replace("SELECT_LANG_", "").toLowerCase();
+      } else {
+        // Fallback: match text if they typed the language name
+        const surveyDoc = await getSurveyById(session.surveyId);
+        const supported = surveyDoc?.supportedLanguages || [];
+        const matched = supported.find(lang => lang.toLowerCase() === messageText.toLowerCase().trim());
+        if (matched) {
+          selectedLang = matched;
+        }
+      }
+
+      if (selectedLang) {
+        const surveyDoc = await getSurveyById(session.surveyId);
+        if (!surveyDoc || surveyDoc.status !== "active") {
+          await sendTextMessage(userPhone, "Selected survey is no longer active. Closing session.");
+          await deleteSession(userPhone);
           return res.sendStatus(200);
         }
 
-        // Initialize active session
-        session = await createSession(userPhone, surveyId);
-        await sendTextMessage(userPhone, `Welcome to the survey: "${survey.name}".\n\nPlease enter your phone number (10 digits) to verify your identity:`);
+        session.surveyLanguage = selectedLang;
+        session.currentState = "survey_questions";
+        await session.save();
+
+        const flatQuestions = getFlatQuestions(surveyDoc);
+        const primaryLangIndex = flatQuestions.findIndex(q => q.qid === "primarylanguage" || q.qid === "primaryLanguage");
+        const startIndex = primaryLangIndex !== -1 ? primaryLangIndex : session.currentQuestionIndex;
+
+        await proceedToNextQuestion(session, flatQuestions, startIndex, userPhone, surveyDoc);
       } else {
-        await sendTextMessage(userPhone, "Please select a survey from the list menu above.");
+        await sendTextMessage(userPhone, "Please select a valid language from the options provided.");
       }
       return res.sendStatus(200);
     }
@@ -234,261 +504,7 @@ export const handleIncomingMessage = async (req, res) => {
 
     const flatQuestions = getFlatQuestions(survey);
 
-    // --- STATE 2: PHONE COLLECTION ---
-    if (session.currentState === "phone_collection") {
-      const cleanPhone = messageText.replace(/\D/g, "");
-      if (cleanPhone.length !== 10) {
-        await sendTextMessage(userPhone, "Invalid phone number format. Please enter a valid 10-digit phone number:");
-        return res.sendStatus(200);
-      }
-
-      // Generate OTP and send it
-      const otpCode = generateOtpCode();
-      session.currentState = "otp_sent";
-      // Save phone number temporary target
-      session.currentQuestionId = cleanPhone; 
-      await session.save();
-
-      await sendOtp(cleanPhone, otpCode);
-      await sendTextMessage(
-        userPhone,
-        `We have sent a 6-digit verification code to +91${cleanPhone}.\n\nPlease enter the code below (or type "RESEND" to try again):`
-      );
-      return res.sendStatus(200);
-    }
-
-    // --- STATE 3: OTP SENT/VERIFICATION ---
-    if (session.currentState === "otp_sent") {
-      const enteredCode = messageText.trim();
-      const targetPhone = session.currentQuestionId;
-
-      if (enteredCode.toLowerCase() === "resend") {
-        const otpCode = generateOtpCode();
-        await sendOtp(targetPhone, otpCode);
-        await sendTextMessage(userPhone, `OTP resent to +91${targetPhone}. Enter the code:`);
-        return res.sendStatus(200);
-      }
-
-      const verified = await verifyOtp(targetPhone, enteredCode);
-      if (!verified) {
-        await sendTextMessage(userPhone, "Invalid or expired code. Please enter the correct code, or reply 'RESEND':");
-        return res.sendStatus(200);
-      }
-
-      // OTP Verified successfully!
-      session.verificationStatus = "verified";
-      session.currentState = "demographic_collection";
-      await session.save();
-
-      await sendTextMessage(userPhone, "✅ Identity verified successfully!");
-
-      // --- STATE 4: EXISTING RESPONDENT LOOKUP ---
-      const profile = await lookupRespondent(targetPhone);
-      if (profile) {
-        await sendTextMessage(userPhone, "Existing citizen profile found. Pre-populating demographics and skipping completed fields.");
-        
-        // Prefill demographic answers
-        const demoQuestions = flatQuestions.filter(q => q.sectionName === "Demographics");
-        demoQuestions.forEach(q => {
-          // Map properties appropriately
-          let val = "";
-          if (q.qid === "fullname" || q.qid === "fullName") val = profile.fullname;
-          else if (q.qid === "age") val = profile.age;
-          else if (q.qid === "gender") val = profile.gender;
-          else if (q.qid === "primarylanguage" || q.qid === "primaryLanguage") val = profile.primarylanguage;
-          else if (q.qid === "pincode") val = profile.pincode;
-          else if (q.qid === "area") val = profile.area;
-          else if (q.qid === "education") val = profile.education;
-          else if (q.qid === "occupation") val = profile.occupation;
-
-          if (val) {
-            session.answers.set(q.qid, val);
-          }
-        });
-
-        // Determine if pincode is missing, or continue
-        if (profile.pincode) {
-          session.currentState = "survey_questions";
-          // Check location codes to enrich Response paradata
-          const locDetails = await resolveLocationByPincode(profile.pincode);
-          const responseDoc = await SurveyResponse.findOne({ 
-            surveyId: survey._id, 
-            respondent: session.userPhone, 
-            status: "in_progress" 
-          });
-          if (responseDoc) {
-            responseDoc.paraInfo.locationInfo = {
-              pincode: profile.pincode,
-              state: locDetails.state,
-              district: locDetails.district,
-              blockName: locDetails.block,
-              village: locDetails.village,
-              stateLGDCode: locDetails.lgdStateCode,
-              districtLGDCode: locDetails.lgdDistrictCode
-            };
-            await responseDoc.save();
-          }
-
-          // Move directly to core questions
-          const nextIdx = getNextQuestionIndex(flatQuestions, demoQuestions.length, session.answers);
-          if (nextIdx === -1) {
-            session.currentState = "completed";
-            await session.save();
-            await triggerCompletionFlow(session, survey);
-            return res.sendStatus(200);
-          }
-
-          session.currentQuestionIndex = nextIdx;
-          const nextQ = flatQuestions[nextIdx];
-          session.currentQuestionId = nextQ.qid;
-          await session.save();
-
-          await askQuestion(userPhone, nextQ, session.surveyLanguage);
-        } else {
-          session.currentState = "pincode_collection";
-          await session.save();
-          await sendTextMessage(userPhone, "Please enter your 6-digit postal pincode:");
-        }
-      } else {
-        // New user - start demographics questioning
-        const firstDemoQ = flatQuestions.find(q => q.sectionName === "Demographics");
-        if (firstDemoQ) {
-          session.currentQuestionIndex = flatQuestions.indexOf(firstDemoQ);
-          session.currentQuestionId = firstDemoQ.qid;
-          await session.save();
-          await askQuestion(userPhone, firstDemoQ, session.surveyLanguage);
-        } else {
-          // If no Demographics section exists (unlikely in NARAD), go straight to pincode
-          session.currentState = "pincode_collection";
-          await session.save();
-          await sendTextMessage(userPhone, "Please enter your 6-digit postal pincode:");
-        }
-      }
-      return res.sendStatus(200);
-    }
-
-    // --- STATE 5: DEMOGRAPHIC COLLECTION (MANUAL QUESTIONING) ---
-    if (session.currentState === "demographic_collection") {
-      const qIndex = session.currentQuestionIndex;
-      const question = flatQuestions[qIndex];
-
-      // Validate answer
-      const validatedVal = validateAnswerInput(question, messageText, interactivePayload);
-      if (validatedVal === null) {
-        await sendTextMessage(userPhone, `⚠️ Invalid option selected. Please try again.`);
-        await askQuestion(userPhone, question, session.surveyLanguage);
-        return res.sendStatus(200);
-      }
-
-      // Save answer incrementally
-      await saveIncrementalAnswer(session, question.qid, validatedVal, flatQuestions);
-
-      // Find next question in Demographics section
-      const nextIdx = qIndex + 1;
-      const nextQ = flatQuestions[nextIdx];
-
-      if (nextQ && nextQ.sectionName === "Demographics") {
-        session.currentQuestionIndex = nextIdx;
-        session.currentQuestionId = nextQ.qid;
-        await session.save();
-        await askQuestion(userPhone, nextQ, session.surveyLanguage);
-      } else {
-        // Demographics completed! Save to Master profile first
-        const answersMap = {};
-        session.answers.forEach((v, k) => {
-          answersMap[k] = v;
-        });
-
-        // Set primary language
-        if (answersMap.primarylanguage || answersMap.primaryLanguage) {
-          session.surveyLanguage = (answersMap.primarylanguage || answersMap.primaryLanguage).toString().toLowerCase();
-        }
-
-        await saveRespondentDemographics(session.userPhone, answersMap);
-
-        // Transition to pincode
-        session.currentState = "pincode_collection";
-        await session.save();
-        await sendTextMessage(userPhone, "Please enter your 6-digit postal pincode:");
-      }
-      return res.sendStatus(200);
-    }
-
-    // --- STATE 6: PINCODE COLLECTION & ENRICHMENT ---
-    if (session.currentState === "pincode_collection") {
-      const pincode = messageText.trim();
-      if (!validatePincodeFormat(pincode)) {
-        await sendTextMessage(userPhone, "⚠️ Invalid pincode format. Please enter a valid 6-digit postal pincode (e.g. 560001):");
-        return res.sendStatus(200);
-      }
-
-      // Resolve geo LGD codes
-      try {
-        const locationDetails = await resolveLocationByPincode(pincode);
-        
-        // Save pincode in session answers
-        session.answers.set("pincode", pincode);
-        session.answers.set("area", locationDetails.village || locationDetails.block);
-        
-        // Save to SurveyResponse paradata
-        const responseDoc = await SurveyResponse.findOne({ 
-          surveyId: survey._id, 
-          respondent: session.userPhone, 
-          status: "in_progress" 
-        });
-
-        if (responseDoc) {
-          responseDoc.paraInfo.locationInfo = {
-            pincode,
-            state: locationDetails.state,
-            district: locationDetails.district,
-            subDistrict: locationDetails.district,
-            blockName: locationDetails.block,
-            village: locationDetails.village,
-            stateLGDCode: locationDetails.lgdStateCode,
-            districtLGDCode: locationDetails.lgdDistrictCode
-          };
-          await responseDoc.save();
-        }
-
-        // Upsert demographics
-        const answersMap = {};
-        session.answers.forEach((v, k) => {
-          answersMap[k] = v;
-        });
-        await saveRespondentDemographics(session.userPhone, answersMap);
-
-        await sendTextMessage(userPhone, `📍 Pincode resolved: ${locationDetails.village || locationDetails.block}, ${locationDetails.district}, ${locationDetails.state}.`);
-
-        // Transition to survey questions
-        session.currentState = "survey_questions";
-        
-        // Find first question index after Demographics section
-        const firstSurveyQIdx = flatQuestions.findIndex(q => q.sectionName !== "Demographics");
-        const nextIdx = getNextQuestionIndex(flatQuestions, firstSurveyQIdx === -1 ? 0 : firstSurveyQIdx, session.answers);
-
-        if (nextIdx === -1) {
-          session.currentState = "completed";
-          await session.save();
-          await triggerCompletionFlow(session, survey);
-          return res.sendStatus(200);
-        }
-
-        session.currentQuestionIndex = nextIdx;
-        const nextQ = flatQuestions[nextIdx];
-        session.currentQuestionId = nextQ.qid;
-        await session.save();
-
-        await askQuestion(userPhone, nextQ, session.surveyLanguage);
-
-      } catch (error) {
-        console.error(`Pincode enrichment API failed for ${pincode}:`, error.message);
-        await sendTextMessage(userPhone, "⚠️ Failed to resolve location details from that pincode. Let's try again. Please enter a valid 6-digit postal pincode:");
-      }
-      return res.sendStatus(200);
-    }
-
-    // --- STATE 7: SURVEY QUESTIONS ENGINE & SKIP LOGIC ---
+    // --- CASE 4: SURVEY QUESTIONS ENGINE ---
     if (session.currentState === "survey_questions") {
       const qIndex = session.currentQuestionIndex;
       const question = flatQuestions[qIndex];
@@ -550,10 +566,88 @@ export const handleIncomingMessage = async (req, res) => {
 
       // Save answer incrementally
       await saveIncrementalAnswer(session, question.qid, validatedVal, flatQuestions);
+
+      // --- LANGUAGE PROMPT TRIGGER POST-PRIMARYLANGUAGE ---
+      if (question.qid === "primarylanguage" || question.qid === "primaryLanguage") {
+        session.currentState = "language_selection";
+        await session.save();
+
+        const supported = survey.supportedLanguages || [];
+        const formattedLanguages = supported.map(lang => {
+          const title = lang.charAt(0).toUpperCase() + lang.slice(1);
+          return {
+            id: `SELECT_LANG_${lang.toLowerCase()}`,
+            title: title
+          };
+        });
+
+        if (formattedLanguages.length <= 3) {
+          await sendInteractiveButtons(
+            userPhone,
+            "Please select the language you want to attempt the rest of the survey in:",
+            formattedLanguages
+          );
+        } else {
+          await sendInteractiveList(
+            userPhone,
+            "Please select the language you want to attempt the rest of the survey in:",
+            "Select Language",
+            "Languages Available",
+            formattedLanguages.map(opt => ({
+              id: opt.id,
+              title: opt.title
+            }))
+          );
+        }
+
+        // Also update demographics details as it's a demographic question
+        const answersMap = {};
+        session.answers.forEach((v, k) => {
+          answersMap[k] = v;
+        });
+        await saveRespondentDemographics(userPhone, answersMap);
+
+        return res.sendStatus(200);
+      }
+
+      // Update demographics master collection if this is a demographic question
+      if (question.sectionName === "Demographics") {
+        const answersMap = {};
+        session.answers.forEach((v, k) => {
+          answersMap[k] = v;
+        });
+
+        await saveRespondentDemographics(userPhone, answersMap);
+      }
+
+      // If pincode was answered, resolve geo paradata
+      if (question.qid === "pincode" || question.qid === "pinCode") {
+        try {
+          const locDetails = await resolveLocationByPincode(validatedVal);
+          await SurveyResponse.findOneAndUpdate(
+            { surveyId: survey._id, respondent: userPhone, status: "in_progress" },
+            {
+              $set: {
+                "paraInfo.locationInfo": {
+                  pincode: validatedVal,
+                  state: locDetails.state,
+                  district: locDetails.district,
+                  blockName: locDetails.block,
+                  village: locDetails.village,
+                  stateLGDCode: locDetails.lgdStateCode,
+                  districtLGDCode: locDetails.lgdDistrictCode
+                }
+              }
+            }
+          );
+        } catch (err) {
+          console.warn("Failed to resolve pincode during survey questions flow:", err.message);
+        }
+      }
+
       await proceedToNextQuestion(session, flatQuestions, qIndex, userPhone, survey);
       return res.sendStatus(200);
     }
-
   } catch (error) {
     console.error("Critical error in WhatsApp incoming webhook controller:", error);
     return res.sendStatus(500);
@@ -593,7 +687,8 @@ const triggerCompletionFlow = async (session, survey) => {
       {
         $set: {
           status: "completed",
-          completedAt: new Date()
+          completedAt: new Date(),
+          "paraInfo.interviewInfo.interviewEndTime": new Date()
         }
       }
     );
@@ -606,6 +701,39 @@ const triggerCompletionFlow = async (session, survey) => {
   await sendTextMessage(
     session.userPhone,
     "Thank you for completing the survey. Your responses have been successfully recorded with the Ministry of Statistics (MoSPI). 🙏"
+  );
+};
+
+/**
+ * Handle exiting the survey response early.
+ */
+const triggerExitFlow = async (session, survey) => {
+  console.log(`[Survey Exit] Exited survey ${session?.surveyId} for respondent: ${session?.userPhone}`);
+  
+  if (session && session.surveyId && session.surveyId !== "pending") {
+    // 1. Finalize Response record in DB as exited
+    const surveyDoc = await Survey.findOne({ surveyId: session.surveyId });
+    if (surveyDoc) {
+      await SurveyResponse.findOneAndUpdate(
+        { surveyId: surveyDoc._id, respondent: session.userPhone, status: "in_progress" },
+        {
+          $set: {
+            status: "exited",
+            completedAt: new Date(),
+            "paraInfo.interviewInfo.interviewEndTime": new Date()
+          }
+        }
+      );
+    }
+  }
+
+  // 2. Clean up active session
+  await deleteSession(session.userPhone);
+
+  // 3. Send exit message
+  await sendTextMessage(
+    session.userPhone,
+    "You have successfully exited the survey. Your partial responses have been recorded. You can start a new survey anytime by typing hello. Thank you! 🙏"
   );
 };
 

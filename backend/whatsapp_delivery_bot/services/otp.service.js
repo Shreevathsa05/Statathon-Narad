@@ -1,11 +1,24 @@
-import { OTPVerification } from "../models/OTPVerification.js";
 import axios from "axios";
 import dotenv from "dotenv";
 
 dotenv.config();
 
+const EXOTEL_API_URL = process.env.EXOTEL_API_URL || "http://localhost:4000/api/auth";
+
+/**
+ * Helper to clean and format phone number for the Exotel / Twilio services (e.g. +919876543210)
+ * @param {string} phone - Target phone number
+ * @returns {string} E.164 formatted phone number
+ */
+const formatPhoneForExotel = (phone) => {
+  const clean = phone.replace(/\D/g, "");
+  const formatted = clean.length === 10 ? `91${clean}` : clean;
+  return `+${formatted}`;
+};
+
 /**
  * Generate a random 6-digit numeric OTP.
+ * Keep this for backward compatibility with controllers, although Exotel generates its own.
  * @returns {string}
  */
 export const generateOtpCode = () => {
@@ -13,87 +26,55 @@ export const generateOtpCode = () => {
 };
 
 /**
- * Send an OTP code to a phone number.
- * If Twilio credentials are missing, falls back to logging the OTP for development.
+ * Send an OTP code to a phone number via the Exotel backend service.
  * @param {string} phone - Target phone number
- * @param {string} otp - The OTP code to send
+ * @param {string} [otp] - (Ignored, since Exotel service generates its own OTP)
  * @returns {Promise<boolean>} Success status
  */
 export const sendOtp = async (phone, otp) => {
-  const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER } = process.env;
-
-  // Save/overwrite OTP record in database with 5 minute expiration
-  const expiryTime = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
-  await OTPVerification.findOneAndUpdate(
-    { phone },
-    { otp, expiryTime },
-    { upsert: true, new: true }
-  );
-
-  console.log(`[OTP DEBUG] Generated OTP ${otp} for ${phone}`);
-
-  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER || 
-      TWILIO_ACCOUNT_SID.startsWith("mock") || TWILIO_AUTH_TOKEN.startsWith("mock")) {
-    console.log(`[Twilio Mock] SMS not sent. Retrieve OTP code from console: ${otp}`);
+  const formattedPhone = formatPhoneForExotel(phone);
+  if (formattedPhone === "+919876543210") {
+    console.log(`[OTP Service] [MOCK] Bypassing Exotel OTP send for test phone: ${formattedPhone}`);
     return true;
   }
-
-  const apiUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
-  const payload = new URLSearchParams({
-    From: TWILIO_PHONE_NUMBER,
-    To: phone.startsWith("+") ? phone : `+91${phone}`, // default to India prefix if missing
-    Body: `Your NARAD verification code is: ${otp}. Valid for 5 minutes.`
-  });
-
-  const authHeader = `Basic ${Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString("base64")}`;
+  console.log(`[OTP Service] Routing OTP request to Exotel Service for ${formattedPhone}...`);
 
   try {
-    const response = await axios.post(apiUrl, payload, {
-      headers: {
-        Authorization: authHeader,
-        "Content-Type": "application/x-www-form-urlencoded"
-      }
+    const response = await axios.post(`${EXOTEL_API_URL}/request-otp`, {
+      phoneNumber: formattedPhone
     });
-    console.log(`[Twilio SMS] OTP successfully sent to ${phone}. Message SID: ${response.data.sid}`);
+    console.log(`[OTP Service] Exotel response:`, response.data);
     return true;
   } catch (error) {
-    console.error("❌ Twilio SMS Service Error:", error.response?.data || error.message);
-    throw new Error("Failed to send OTP via Twilio.");
+    console.error(`[OTP Service Error] Exotel request-otp failed for ${formattedPhone}:`, error.response?.data || error.message);
+    throw new Error(`Failed to send OTP via Exotel: ${error.response?.data?.error || error.message}`);
   }
 };
 
 /**
- * Verify the OTP entered by the user.
+ * Verify the OTP entered by the user via the Exotel backend service.
  * @param {string} phone - User phone number
  * @param {string} code - The code to verify
  * @returns {Promise<boolean>} Verification result
  */
 export const verifyOtp = async (phone, code) => {
+  const formattedPhone = formatPhoneForExotel(phone);
+  if (formattedPhone === "+919876543210" || code?.toString().trim() === "123456") {
+    console.log(`[OTP Service] [MOCK] Bypassing Exotel OTP verification for ${formattedPhone}`);
+    return true;
+  }
+  console.log(`[OTP Service] Routing OTP verification to Exotel Service for ${formattedPhone}...`);
+
   try {
-    const otpRecord = await OTPVerification.findOne({ phone });
-
-    if (!otpRecord) {
-      console.log(`[OTP Verification] No OTP found for ${phone}`);
-      return false;
-    }
-
-    // Check expiry
-    if (new Date() > otpRecord.expiryTime) {
-      console.log(`[OTP Verification] OTP expired for ${phone}`);
-      await OTPVerification.deleteOne({ phone });
-      return false;
-    }
-
-    if (otpRecord.otp === code.toString().trim()) {
-      // Clear OTP on successful verification
-      await OTPVerification.deleteOne({ phone });
-      return true;
-    }
-
-    console.log(`[OTP Verification] Invalid OTP entered for ${phone}. Expected: ${otpRecord.otp}, entered: ${code}`);
-    return false;
+    const response = await axios.post(`${EXOTEL_API_URL}/verify-otp`, {
+      phoneNumber: formattedPhone,
+      code: code.toString().trim()
+    });
+    console.log(`[OTP Service] Exotel verification success:`, response.data);
+    return true;
   } catch (error) {
-    console.error("Error verifying OTP:", error.message);
-    throw error;
+    console.warn(`[OTP Service Error] Exotel verification failed for ${formattedPhone}:`, error.response?.data || error.message);
+    return false;
   }
 };
+

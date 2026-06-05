@@ -93,6 +93,17 @@ export const getNextQuestionIndex = (flatQuestions, startIndex, answers) => {
 
   for (let i = startIndex; i < flatQuestions.length; i++) {
     const question = flatQuestions[i];
+    
+    // Check if the question already has an answer in the session answers map
+    const hasAnswer = answers instanceof Map 
+      ? answers.has(question.qid) 
+      : (answers && answers[question.qid] !== undefined);
+
+    if (hasAnswer) {
+      console.log(`[Skip Logic] Skipping already answered question ${question.qid} at index ${i}`);
+      continue;
+    }
+
     if (shouldShowQuestion(question, answers)) {
       return i;
     }

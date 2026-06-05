@@ -16,6 +16,7 @@ const SurveySessionSchema = new mongoose.Schema(
       type: String,
       enum: [
         "survey_selection",
+        "language_selection",
         "phone_collection",
         "otp_sent",
         "otp_verified",

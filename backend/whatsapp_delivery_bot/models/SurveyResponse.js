@@ -55,7 +55,7 @@ const SurveyResponseSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["in_progress", "completed"],
+      enum: ["in_progress", "completed", "exited"],
       default: "in_progress",
       index: true
     },
@@ -73,6 +73,14 @@ const SurveyResponseSchema = new mongoose.Schema(
     response: {
       type: [ResponseSchema],
       default: []
+    },
+    flags: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: []
+    },
+    isFlagged: {
+      type: Boolean,
+      default: false
     }
   },
   { timestamps: true, collection: "surveyresponses" }
