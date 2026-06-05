@@ -4,7 +4,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { SurveyResponse } from "../models/responsesSchema.js";
 import { Survey } from "../models/surveySchema.js";
 import { processResponsePincode } from "../utils/pincodeProcessor.js";
-import { runVirtualEnumerator } from "../utils/virtualEnumerator.js";
+import { evaluateSingleResponse } from "../utils/virtualEnumerator.js";
 
 export const submitSurveyResponse = asyncHandler(async (req, res) => {
     const { survey_id } = req.params;
@@ -125,9 +125,14 @@ export const submitSurveyResponse = asyncHandler(async (req, res) => {
     });
 
     // Asynchronous background processing (fire-and-forget)
-    processResponsePincode(surveyResponse._id).catch((err) => {
-        console.error(`[Pincode Processor] Background processing failed for response ${surveyResponse._id}:`, err);
-    });
+    (async () => {
+        try {
+            await processResponsePincode(surveyResponse._id);
+            await evaluateSingleResponse(surveyResponse._id);
+        } catch (err) {
+            console.error(`[Background Processor] failed for response ${surveyResponse._id}:`, err);
+        }
+    })();
 
     return res.status(201).json(
         new ApiResponse(201, surveyResponse, "Successfully created survey response")
@@ -153,20 +158,24 @@ export const getAllSurveyResponseBySurveyId = asyncHandler(async (req, res) => {
     );
 });
 
-export const scanAndFetchFlaggedResponses = asyncHandler(async (req, res) => {
+export const getFlaggedResponsesBySurveyId = asyncHandler(async (req, res) => {
     const { survey_id } = req.params;
 
     if (!survey_id) {
         throw new ApiError(400, "Survey id is required");
     }
 
-    // NOTE: This runs synchronously and waits for all processing to complete.
-    // If response volume scales massively, this will cause API timeouts.
-    // For scale, we will need to implement an async job queue (e.g., Redis/BullMQ)
-    // where this endpoint returns a job ID and the client polls for completion.
-    const flaggedResponses = await runVirtualEnumerator(survey_id);
+    const survey = await Survey.findOne({ surveyId: survey_id });
+    if (!survey) {
+        throw new ApiError(404, "Survey not found");
+    }
+
+    const flaggedResponses = await SurveyResponse.find({ 
+        surveyId: survey._id, 
+        isFlagged: true 
+    });
 
     return res.status(200).json(
-        new ApiResponse(200, flaggedResponses, "Successfully scanned and fetched flagged responses")
+        new ApiResponse(200, flaggedResponses, "Successfully fetched flagged responses")
     );
 });
