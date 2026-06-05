@@ -6,7 +6,7 @@ import { Demographics } from "../models/demographics.js";
 import { hashAadhaar } from "../utils/hash.js";
 
 export const createDemographic = asyncHandler(async (req, res) => {
-    const {
+    let {
         aadhaarNo,
         phone,
         fullName,
@@ -30,8 +30,31 @@ export const createDemographic = asyncHandler(async (req, res) => {
         throw new ApiError(400, "All fields are required");
     }
 
-    const cleanAadhaar = aadhaarNo.replace(/\D/g, "");
-    const cleanPhone = phone.replace(/\D/g, "");
+    const cleanAadhaar = String(aadhaarNo).replace(/\D/g, "");
+    const cleanPhone = String(phone).replace(/\D/g, "");
+
+    fullName = String(fullName).trim().toLowerCase();
+    gender = String(gender).trim().toLowerCase();
+    primaryLanguage = String(primaryLanguage).trim().toLowerCase();
+    area = String(area).trim().toLowerCase();
+
+    pincode = String(pincode).replace(/\D/g, "");
+
+    if (cleanAadhaar.length !== 12) {
+        throw new ApiError(400, "Invalid Aadhaar number");
+    }
+
+    if (cleanPhone.length !== 10) {
+        throw new ApiError(400, "Invalid phone number");
+    }
+
+    if (pincode.length !== 6) {
+        throw new ApiError(400, "Invalid pincode");
+    }
+
+    if (typeof age !== "number" || age < 0 || age > 120) {
+        throw new ApiError(400, "Invalid age");
+    }
 
     const userKey = hashAadhaar(cleanAadhaar);
 
@@ -48,7 +71,9 @@ export const createDemographic = asyncHandler(async (req, res) => {
 
     return res
         .status(201)
-        .json(new ApiResponse(201, demographic, "Demographic created successfully"));
+        .json(
+            new ApiResponse(201, demographic, "Demographic created successfully")
+        );
 });
 
 export const getDemographic = asyncHandler(async (req, res) => {

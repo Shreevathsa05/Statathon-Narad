@@ -12,4 +12,10 @@ export const campaignClient = {
   getTargets: (surveyId) => {
     return client.get(`/campaign/targets/${surveyId}`);
   },
+  deleteTargets: (surveyId) => {
+    return client.delete(`/campaign/targets/${surveyId}`);
+  },
+  makeGeneralAccess: (surveyId) => {
+    return client.post(`/campaign/general/${surveyId}`);
+  },
 };

@@ -9,18 +9,17 @@ export default function FODPage() {
   const [surveys, setSurveys] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   const navigate = useNavigate();
 
   const fetchSurveys = async () => {
     try {
       setLoading(true);
-      const res = await surveyClient.getSurveys({ status: "active" });
-      const surveyList = Array.isArray(res.data.data) ? res.data.data : [];
-      // Show mostly active and approved surveys for FOD
-      const fodSurveys = surveyList.filter((s) =>
-        ["active", "approved", "complete"].includes(s.status),
-      );
+      const res = await surveyClient.getSurveys({
+        status: ["approved", "active"],
+      });
+      const fodSurveys = Array.isArray(res.data.data) ? res.data.data : [];
+
       const sorted = fodSurveys.sort(
         (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
       );

@@ -23,9 +23,9 @@ export default function FODSurveyDetails() {
   const [isChannelsModalOpen, setIsChannelsModalOpen] = useState(false);
   const [isTargetingModalOpen, setIsTargetingModalOpen] = useState(false);
 
-  const fetchSurvey = async () => {
+  const fetchSurvey = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
       // Wait, is it getSurveyById? Yes, surveyClient.getSurveyById
       const res = await surveyClient.getSurveyById(surveyId);
@@ -35,12 +35,12 @@ export default function FODSurveyDetails() {
       setError("Failed to load survey details.");
       toast.error("Failed to load survey details.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   const fetchTargets = async () => {
-    if (!survey || survey.accessType !== "targeted") return;
+    if (!survey || survey.accessType === null) return;
     try {
       setLoadingTargets(true);
       const res = await campaignClient.getTargets(survey.surveyId);
@@ -60,13 +60,13 @@ export default function FODSurveyDetails() {
   }, [surveyId]);
 
   useEffect(() => {
-    if (survey && survey.accessType === "targeted") {
+    if (survey && survey.accessType !== null) {
       fetchTargets();
     }
   }, [survey]);
 
   const handleUpdate = () => {
-    fetchSurvey(); // This will consequently trigger fetchTargets if needed
+    fetchSurvey(true); // This will consequently trigger fetchTargets if needed
   };
 
   if (loading) {
@@ -123,12 +123,37 @@ export default function FODSurveyDetails() {
             >
               <Settings size={16} /> Delivery Channels
             </button>
-            <button
-              onClick={() => setIsTargetingModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-black text-white text-sm font-medium rounded-md hover:bg-neutral-800 transition-colors shadow-sm"
-            >
-              <Target size={16} /> Targeting Audience
-            </button>
+            {!(
+              survey.status === "active" && survey.targetSource === "generated"
+            ) && (
+              <button
+                onClick={() => setIsTargetingModalOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-black text-white text-sm font-medium rounded-md hover:bg-neutral-800 transition-colors shadow-sm"
+              >
+                <Target size={16} /> Targeting Audience
+              </button>
+            )}
+            {survey.status === "approved" && (
+              <button
+                onClick={async () => {
+                  try {
+                    await surveyClient.updateSurvey(survey.surveyId, {
+                      status: "active",
+                    });
+                    toast.success("Survey is now active!");
+                    handleUpdate();
+                  } catch (err) {
+                    toast.error(
+                      "Failed to activate survey: " +
+                        (err.message || "Unknown error"),
+                    );
+                  }
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-md hover:bg-emerald-700 transition-colors shadow-sm"
+              >
+                Make Active
+              </button>
+            )}
           </div>
         </div>
 
@@ -136,10 +161,9 @@ export default function FODSurveyDetails() {
           <div className="px-6 py-4 border-b border-border bg-bg flex justify-between items-center">
             <div className="flex items-center gap-2 text-text-primary font-semibold">
               <Users size={18} />
-              Targeted Audience (
-              {survey.accessType === "targeted" ? targets.length : ""})
+              Targeted Audience ({targets.length})
             </div>
-            {survey.accessType === "targeted" && (
+            {survey.accessType !== null && (
               <button
                 onClick={fetchTargets}
                 disabled={loadingTargets}
@@ -151,19 +175,18 @@ export default function FODSurveyDetails() {
           </div>
 
           <div className="flex-1 overflow-y-auto p-6 bg-bg">
-            {survey.accessType !== "targeted" ? (
+            {survey.accessType === null ? (
               <div className="flex flex-col items-center justify-center p-12 text-center bg-surface border border-dashed border-border rounded-md text-text-muted h-full">
                 <Target size={48} className="opacity-20 mb-4" />
                 <p className="text-lg font-medium text-text-primary">
-                  General Access
+                  Targeting Not Configured
                 </p>
                 <p className="text-sm mt-2 max-w-md">
-                  This survey is currently open to a general audience. No
-                  specific targets have been defined.
+                  Please configure the access type for this survey.
                 </p>
                 <button
                   onClick={() => setIsTargetingModalOpen(true)}
-                  className="mt-6 px-4 py-2 bg-surface border border-border text-black text-sm font-medium rounded-md hover:border-black transition-colors"
+                  className="mt-6 px-4 py-2 bg-black text-white text-sm font-medium rounded-md hover:bg-neutral-800 transition-colors shadow-sm"
                 >
                   Configure Targeting
                 </button>
@@ -190,9 +213,6 @@ export default function FODSurveyDetails() {
                   <thead className="bg-bg border-b border-border sticky top-0">
                     <tr>
                       <th className="px-4 py-3 font-medium text-text-secondary">
-                        User Key (Hash)
-                      </th>
-                      <th className="px-4 py-3 font-medium text-text-secondary">
                         Phone
                       </th>
                       <th className="px-4 py-3 font-medium text-text-secondary text-right">
@@ -206,9 +226,6 @@ export default function FODSurveyDetails() {
                         key={t._id || idx}
                         className="border-b border-border last:border-0 hover:bg-bg/50 transition-colors"
                       >
-                        <td className="px-4 py-3 text-text-primary font-mono truncate max-w-[200px]">
-                          {t.userKey}
-                        </td>
                         <td className="px-4 py-3 text-text-primary">
                           {t.phone || "-"}
                         </td>

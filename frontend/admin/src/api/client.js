@@ -24,7 +24,16 @@ async function fetchWithInterceptor(url, options = {}, isRetry = false) {
 
   let finalUrl = `${baseURL}${url}`;
   if (options.query) {
-    const params = new URLSearchParams(options.query);
+    const params = new URLSearchParams();
+
+    Object.entries(options.query).forEach(([key, value]) => {
+      if (Array.isArray(value)) {
+        value.forEach((v) => params.append(key, v));
+      } else {
+        params.append(key, value);
+      }
+    });
+
     finalUrl += `?${params.toString()}`;
   }
 
@@ -65,10 +74,8 @@ async function fetchWithInterceptor(url, options = {}, isRetry = false) {
 }
 
 const client = {
-  get: (url, options) => {
-    console.log(options);
-    return fetchWithInterceptor(url, { ...options, method: "GET" });
-  },
+  get: (url, options) =>
+    fetchWithInterceptor(url, { ...options, method: "GET" }),
   post: (url, body, options) =>
     fetchWithInterceptor(url, { ...options, method: "POST", body }),
   patch: (url, body, options) =>

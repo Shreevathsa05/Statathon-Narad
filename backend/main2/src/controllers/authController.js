@@ -238,7 +238,7 @@ export const completeAuth = asyncHandler(async (req, res) => {
         try {
             const verificationCheck = await twilioClient.verify.v2.services(twilioServiceSid)
                 .verificationChecks.create({ to: `+91${phoneToVerify}`, code: otp });
-            
+
             if (verificationCheck.status !== 'approved') {
                 throw new ApiError(401, "Invalid OTP code");
             }
