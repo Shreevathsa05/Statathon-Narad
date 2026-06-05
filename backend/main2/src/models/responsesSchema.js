@@ -1,5 +1,17 @@
 import mongoose, { Schema } from "mongoose";
 
+const FlagSchema = new mongoose.Schema({
+	type: {
+		type: String,
+	},
+	reason: {
+		type: String,
+	},
+	severity: {
+		type: String, // 'high', 'medium', 'low'
+	}
+}, { _id: false });
+
 const ParaInfoSchema = new mongoose.Schema(
 	{
 		deviceInfo: {
@@ -85,6 +97,12 @@ const SurveyResponseSchema = new mongoose.Schema(
 		paraInfo: ParaInfoSchema,
 
 		response: [ResponseSchema],
+
+		flags: [FlagSchema],
+		isFlagged: {
+			type: Boolean,
+			default: false
+		}
 	},
 	{ timestamps: true },
 );

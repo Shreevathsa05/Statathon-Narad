@@ -5,6 +5,7 @@ import { NodeSDK } from "@opentelemetry/sdk-node";
 import { LangfuseSpanProcessor } from "@langfuse/otel";
 import { CallbackHandler } from "@langfuse/langchain";
 import { Survey } from "./src/mongodb/surveySchema.js";
+import { logger } from "./src/utils/logger.js";
 
 const sdk = new NodeSDK({
     spanProcessors: [new LangfuseSpanProcessor()],
@@ -27,14 +28,14 @@ async function startServer() {
             { $set: { status: "pending" } }
         );
         if (stuckSurveys.modifiedCount > 0) {
-            console.log(`Reset ${stuckSurveys.modifiedCount} stuck surveys to 'pending'.`);
+            logger.info(`Reset ${stuckSurveys.modifiedCount} stuck surveys to 'pending'.`);
         }
 
         app.listen(PORT, () => {
-            console.log(`Server listening on ${PORT}`);
+            logger.info(`Server listening on ${PORT}`);
         });
     } catch (error) {
-        console.error("Failed to start application:", error);
+        logger.error("Failed to start application:", error);
         process.exit(1);
     }
 }

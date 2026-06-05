@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { generateTargetsFromDemographics, uploadCampaignExcel, getCampaignTargets } from "../controllers/campaignController.js";
+import { generateTargetsFromDemographics, uploadCampaignExcel, getCampaignTargets, deleteCampaignTargets, makeGeneralAccess } from "../controllers/campaignController.js";
 import { upload } from "../middleware/multer.js";
 import { verifyJWT } from "../middleware/verifyJWT.js";
 
@@ -13,6 +13,8 @@ router.post(
 );
 
 router.post("/generate/:surveyId", generateTargetsFromDemographics);
+router.post("/general/:surveyId", makeGeneralAccess);
 router.get("/targets/:surveyId", getCampaignTargets);
+router.delete("/targets/:surveyId", deleteCampaignTargets);
 
 export default router;

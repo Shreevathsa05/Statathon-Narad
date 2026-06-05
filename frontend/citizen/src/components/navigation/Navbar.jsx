@@ -7,7 +7,7 @@ export default function Navbar() {
 
 	return (
 		<nav
-			className="sticky top-0 z-50 bg-black/90 backdrop-blur-md border-b border-[#2E2E2E]"
+			className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-border shadow-sm shadow-black/5"
 			style={{ fontFamily: "'Geist', system-ui, sans-serif" }}
 		>
 			<div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
@@ -19,7 +19,7 @@ export default function Navbar() {
 						alt="Narad"
 						className="w-6 h-6"
 					/>
-					<span className="text-sm font-semibold text-[#EDEDED] tracking-[-0.02em]">
+					<span className="text-sm font-semibold text-text-primary tracking-[-0.02em]">
 						Narad
 					</span>
 				</Link>
@@ -29,8 +29,8 @@ export default function Navbar() {
 					<Link
 						to="/"
 						className={`px-3 py-1.5 rounded text-xs font-medium transition-colors duration-150 ${isActive("/")
-								? "bg-[#1F1F1F] text-[#EDEDED]"
-								: "text-[#525252] hover:text-[#A1A1A1] hover:bg-[#0A0A0A]"
+								? "bg-surface text-text-primary"
+								: "text-text-muted hover:text-text-primary hover:bg-surface-alt"
 							}`}
 					>
 						Home

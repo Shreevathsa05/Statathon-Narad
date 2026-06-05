@@ -1,14 +1,20 @@
 import { llm_chat, stt, sarvam_voice } from '../models/llms.js'
+import { logger } from './logger.js';
 
 export async function sarvam_voice_generate(text, lang_code) {
-    const res = await sarvam_voice.textToSpeech.convert({
-        text: text,
-        model: "bulbul:v3",
-        speaker: "shubh",
-        target_language_code: lang_code
-    })
+    try {
+        const res = await sarvam_voice.textToSpeech.convert({
+            text: text,
+            model: "bulbul:v3",
+            speaker: "priya",
+            target_language_code: lang_code
+        })
 
-    return res.audios;
+        return res.audios;
+    } catch (error) {
+        logger.error("Error in sarvam_voice_generate:", error);
+        throw error;
+    }
 }
 
 export const lang_codes = {
