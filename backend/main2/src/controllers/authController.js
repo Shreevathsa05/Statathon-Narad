@@ -29,7 +29,7 @@ async function issueTokens(res, user) {
     res.cookie("accessToken", accessToken, { ...COOKIE_OPTS, maxAge: 60 * 60 * 1000 });          // 1h
     res.cookie("refreshToken", refreshToken, { ...COOKIE_OPTS, maxAge: 7 * 24 * 60 * 60 * 1000 }); // 7d
 
-    return { accessToken, user: { id: user._id, email: user.email, role: user.role, name: user.name } };
+    return { accessToken, user: { userId: user._id.toString(), email: user.email, role: user.role, name: user.name } };
 }
 
 /**

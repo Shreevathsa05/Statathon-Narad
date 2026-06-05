@@ -22,7 +22,7 @@ export const getNotifications = async (req, res, next) => {
       .limit(50); // Fetch latest 50
 
     // Compute unread count for this user
-    const unreadCount = notifications.filter(n => !n.readBy.includes(userId)).length;
+    const unreadCount = notifications.filter(n => !n.readBy.some(id => id.toString() === userId.toString())).length;
 
     res.status(200).json({
       success: true,

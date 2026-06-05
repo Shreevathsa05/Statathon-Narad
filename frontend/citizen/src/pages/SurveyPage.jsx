@@ -35,6 +35,10 @@ export default function SurveyPage() {
     const [auth, setAuth] = useState(null);
     const [prefill, setPrefill] = useState(false);
 
+    const [surveyName, setSurveyName] = useState("");
+    const [surveyDescription, setSurveyDescription] = useState("");
+    const [hasAcceptedDescription, setHasAcceptedDescription] = useState(false);
+
     const handleVerified = (data) => {
         setAuth(data);
 
@@ -72,6 +76,8 @@ export default function SurveyPage() {
 
                 setQuestionSections(data?.data?.questionSections || []);
                 setSupportedLanguages(data?.data?.supportedLanguages);
+                setSurveyName(data?.data?.name || "");
+                setSurveyDescription(data?.data?.description || "");
             } catch {
                 setErrors("Network error. Please check your connection.");
             } finally {
@@ -256,6 +262,35 @@ export default function SurveyPage() {
     //         </div>
     //     );
     // }
+
+    if (!hasAcceptedDescription) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-bg px-4 py-12">
+                <div className="max-w-2xl w-full bg-surface border border-border rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-8 md:p-10 space-y-6">
+                    <div className="flex items-center gap-3">
+                        <div className="w-1.5 h-6 rounded-full bg-[#0070F3]"></div>
+                        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-text-primary m-0">
+                            {surveyName || "Loading Survey..."}
+                        </h1>
+                    </div>
+                    
+                    <div className="text-[15px] text-text-muted leading-relaxed whitespace-pre-wrap bg-[#FAFAFA] p-6 rounded-lg border border-[#E5E5E5]">
+                        {surveyDescription || "No description provided."}
+                    </div>
+
+                    <div className="pt-4 flex justify-end">
+                        <button
+                            onClick={() => setHasAcceptedDescription(true)}
+                            className="inline-flex items-center justify-center px-8 h-12 text-[15px] font-medium rounded-lg bg-black text-white hover:bg-neutral-800 transition-all shadow-[0_4px_14px_0_rgb(0,0,0,0.1)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.15)] disabled:opacity-50"
+                            disabled={loading || !surveyName}
+                        >
+                            Attempt the survey
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     if (!auth) {
         return <AuthModal onVerified={handleVerified} />;
