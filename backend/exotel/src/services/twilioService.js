@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-export const triggerOutboundCall = async (toNumber, webhookUrl) => {
+export const triggerOutboundCall = async (toNumber, webhookUrl, statusCallbackUrl = null) => {
   const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER } =
     process.env;
 
@@ -18,6 +18,11 @@ export const triggerOutboundCall = async (toNumber, webhookUrl) => {
     To: toNumber, // Must include country code, e.g., +919876543210
     Url: webhookUrl,
   });
+
+  if (statusCallbackUrl) {
+      payload.append("StatusCallback", statusCallbackUrl);
+      payload.append("StatusCallbackEvent", "completed");
+  }
 
   // Twilio uses standard Basic Auth encoding
   const authHeader = `Basic ${Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString("base64")}`;
@@ -78,5 +83,42 @@ export const sendSmsOtp = async (toNumber, otpCode) => {
     } catch (error) {
         console.error('❌ Twilio SMS Error:', error.response?.data || error.message);
         throw new Error('Failed to send SMS via Twilio.');
+    }
+};
+
+/**
+ * Updates an active Twilio call with new TwiML instructions.
+ * @param {string} callSid - The Twilio Call SID to update.
+ * @param {string} twiml - The new TwiML string to execute.
+ * @returns {Promise<Object>} The Twilio API response.
+ */
+export const updateLiveCall = async (callSid, twiml) => {
+    const { 
+        TWILIO_ACCOUNT_SID, 
+        TWILIO_AUTH_TOKEN 
+    } = process.env;
+
+    const apiUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Calls/${callSid}.json`;
+
+    const payload = new URLSearchParams({
+        Twiml: twiml,
+    });
+
+    const authHeader = `Basic ${Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64')}`;
+
+    try {
+        const response = await axios.post(apiUrl, payload, {
+            headers: {
+                'Authorization': authHeader,
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+        });
+        
+        console.log(`🔄 Twilio call ${callSid} updated successfully`);
+        return response.data;
+        
+    } catch (error) {
+        console.error('❌ Twilio Call Update Error:', error.response?.data || error.message);
+        throw new Error('Failed to update live call via Twilio.');
     }
 };
