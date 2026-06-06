@@ -43,6 +43,10 @@ const getNextQuestionIndex = (questions, currentIndex, responses) => {
 
 // Helper to submit to main2
 const submitResponsesToMain2 = async (session) => {
+    if (!session.responses || session.responses.length === 0) {
+        console.log("No responses collected, skipping submission to main2.");
+        return;
+    }
     try {
         const payload = {
             surveyId: session.surveyId,
@@ -55,6 +59,9 @@ const submitResponsesToMain2 = async (session) => {
             },
             response: session.responses
         };
+        
+        console.log("📤 Submitting payload to main2:\n", JSON.stringify(payload, null, 2));
+        
         const main2Url = process.env.MAIN2_API_URL || 'http://localhost:3000';
         await axios.post(`${main2Url}/api/response/${session.surveyId}`, payload);
         console.log(`✅ Responses submitted to main2 for Call ${session.CallSid}`);
@@ -150,13 +157,14 @@ export const handleCallConnect = (req, res) => {
   if (audioFileId && audioFileId.get) audioFileId = audioFileId.get(session.language); // Map handling
   else if (question.audio && question.audio instanceof Map) audioFileId = question.audio.get(session.language);
   
-  // Proxy URL
-  const audioUrl = `${process.env.NGROK_URL}/api/survey/proxy-audio?surveyId=${session.surveyId}&audioId=${audioFileId}`;
+  // Proxy URL (ampersand must be escaped for valid XML)
+  const audioUrl = `${process.env.NGROK_URL}/api/survey/proxy-audio?surveyId=${session.surveyId}&amp;audioId=${audioFileId}&amp;cb=${Date.now()}`;
 
   const recordingActionUrl = `${process.env.NGROK_URL}/api/survey/webhook/answer`;
 
   const twiml = `<?xml version="1.0" encoding="UTF-8"?>
     <Response>
+        <Pause length="1"/>
         <Play>${audioUrl}</Play>
         <Record action="${recordingActionUrl}" maxLength="60" />
     </Response>`;
@@ -173,7 +181,7 @@ export const handleAnswer = async (req, res) => {
   const session = activeCalls.get(CallSid);
 
   // Immediate response to keep call alive
-  const pleaseWaitAudio = `${process.env.NGROK_URL}/audio/please_wait.mp3`;
+  const pleaseWaitAudio = `${process.env.NGROK_URL}/audio/please_wait.mp3?cb=${Date.now()}`;
   res.set("Content-Type", "text/xml");
   res.status(200).send(`<?xml version="1.0" encoding="UTF-8"?><Response><Play>${pleaseWaitAudio}</Play><Pause length="20"/></Response>`);
 
@@ -187,7 +195,13 @@ export const handleAnswer = async (req, res) => {
     const aiApiUrl = process.env.AI_API_URL || 'http://localhost:3001';
     
     const sttRes = await axios.post(`${aiApiUrl}/speech/stt-twilio-sarvam`, { url: RecordingUrl });
-    const transcribedText = sttRes.data; 
+    let transcribedText = sttRes.data; 
+    
+    // Sarvam API returns an object { transcript: '...' }
+    if (typeof transcribedText === 'object' && transcribedText !== null) {
+        transcribedText = transcribedText.transcript || "";
+    }
+
     console.log(`STT Result for Call ${CallSid}: ${transcribedText}`);
 
     const questions = flattenQuestions(session.surveyData);
@@ -217,13 +231,14 @@ export const handleAnswer = async (req, res) => {
     if (!isValid && session.retryCount < 1) {
         session.retryCount += 1;
         
-        const invalidAudioUrl = `${process.env.NGROK_URL}/audio/invalid_response.mp3`;
+        const invalidAudioUrl = `${process.env.NGROK_URL}/audio/invalid_response.mp3?cb=${Date.now()}`;
         let qAudioId = currentQ.audio && currentQ.audio[session.language];
         if (currentQ.audio && currentQ.audio.get) qAudioId = currentQ.audio.get(session.language);
-        const qAudioUrl = `${process.env.NGROK_URL}/api/survey/proxy-audio?surveyId=${session.surveyId}&audioId=${qAudioId}`;
+        const qAudioUrl = `${process.env.NGROK_URL}/api/survey/proxy-audio?surveyId=${session.surveyId}&amp;audioId=${qAudioId}&amp;cb=${Date.now()}`;
 
         const twiml = `<?xml version="1.0" encoding="UTF-8"?>
         <Response>
+            <Pause length="1"/>
             <Play>${invalidAudioUrl}</Play>
             <Play>${qAudioUrl}</Play>
             <Record action="${process.env.NGROK_URL}/api/survey/webhook/answer" maxLength="60" />
@@ -248,10 +263,11 @@ export const handleAnswer = async (req, res) => {
         const nextQ = questions[nextQIndex];
         let nextAudioId = nextQ.audio && nextQ.audio[session.language];
         if (nextQ.audio && nextQ.audio.get) nextAudioId = nextQ.audio.get(session.language);
-        const nextAudioUrl = `${process.env.NGROK_URL}/api/survey/proxy-audio?surveyId=${session.surveyId}&audioId=${nextAudioId}`;
+        const nextAudioUrl = `${process.env.NGROK_URL}/api/survey/proxy-audio?surveyId=${session.surveyId}&amp;audioId=${nextAudioId}&amp;cb=${Date.now()}`;
 
         const twiml = `<?xml version="1.0" encoding="UTF-8"?>
         <Response>
+            <Pause length="1"/>
             <Play>${nextAudioUrl}</Play>
             <Record action="${process.env.NGROK_URL}/api/survey/webhook/answer" maxLength="60" />
         </Response>`;
@@ -260,9 +276,10 @@ export const handleAnswer = async (req, res) => {
     } else {
         await submitResponsesToMain2(session);
         
-        const thankYouAudio = `${process.env.NGROK_URL}/audio/thank_you.mp3`;
+        const thankYouAudio = `${process.env.NGROK_URL}/audio/thank_you.mp3?cb=${Date.now()}`;
         const twiml = `<?xml version="1.0" encoding="UTF-8"?>
         <Response>
+            <Pause length="1"/>
             <Play>${thankYouAudio}</Play>
             <Hangup />
         </Response>`;
@@ -299,6 +316,7 @@ export const handleCallStatus = async (req, res) => {
  */
 export const proxyAudio = async (req, res) => {
     const { surveyId, audioId } = req.query;
+    console.log(`🔊 Proxying audio for surveyId=${surveyId}, audioId=${audioId}`);
     try {
         const aiApiUrl = process.env.AI_API_URL || 'http://localhost:3001';
         const response = await axios({
@@ -306,7 +324,9 @@ export const proxyAudio = async (req, res) => {
             url: `${aiApiUrl}/speech/audio/${surveyId}/${audioId}`,
             responseType: 'stream'
         });
-        res.setHeader('Content-Type', 'audio/mpeg');
+        
+        // Twilio requires exact headers. Sarvam outputs WAV files disguised as MP3s.
+        res.setHeader('Content-Type', 'audio/x-wav');
         response.data.pipe(res);
     } catch (e) {
         console.error("Error proxying audio:", e.message);

@@ -39,9 +39,10 @@ export default async function stt_from_twilio_whisper(url) {
         filename = await downloadRecording(recordingSid);
 
         transcription = await stt(filename);
-        fs.unlinkSync(filename);
+        if (filename) fs.unlinkSync(filename);
     } catch (error) {
-        fs.unlinkSync(filename);
+        console.error("❌ STT Whisper Error:", error.message || error);
+        if (filename) fs.unlinkSync(filename);
     }
     // console.log("transcription", transcription);
     return transcription;
@@ -63,9 +64,10 @@ export async function stt_from_twilio_sarvam(url) {
             model: "saaras:v3",
             mode: "transcribe"
         });
-        fs.unlinkSync(filename);
+        if (filename) fs.unlinkSync(filename);
     } catch (error) {
-        fs.unlinkSync(filename);
+        console.error("❌ Sarvam STT Error:", error.message || error);
+        if (filename) fs.unlinkSync(filename);
     }
     console.log("transcription", transcription);
     return transcription;
