@@ -24,6 +24,7 @@
     "langchain": "^1.2.1",
     "mongoose": "^9.0.2",
     "multer": "^2.1.1",
+    "sarvamai": "^1.1.7",
     "twilio": "^6.0.2",
     "uuid": "^14.0.0",
     "zod": "^4.2.1"

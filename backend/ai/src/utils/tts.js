@@ -6,7 +6,7 @@ export async function sarvam_voice_generate(text, lang_code) {
         const res = await sarvam_voice.textToSpeech.convert({
             text: text,
             model: "bulbul:v3",
-            speaker: "priya",
+            speaker: "shubh",
             target_language_code: lang_code
         })
 

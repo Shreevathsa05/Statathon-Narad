@@ -1,0 +1,258 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { X } from 'lucide-react';
+import AvatarCanvas from './AvatarCanvas';
+import InteractionModal from './InteractionModal';
+import { shouldShowField } from '../../utils/ConditionEvaluator';
+import { speak } from '../../utils/textToSpeech';
+
+const INSTRUCTION_SCRIPTS = {
+  mcq: "Please select an option from the screen below.",
+  checkbox: "Please select one or more options from the screen below, then click submit.",
+  text: "Click on the microphone button to start speaking your answer. Once you are done, click stop."
+};
+
+const SYSTEM_SCRIPTS = {
+  greeting: "Hello! I am your virtual surveyor. Let's begin the survey.",
+  outro: "Thank you for completing the survey. Your responses have been recorded."
+};
+
+export default function AvatarSurveyMode({ questions, answers, setAnswers, language, surveyId, onComplete, onExit }) {
+  const [script, setScript] = useState([]);
+  const [scriptIndex, setScriptIndex] = useState(-1);
+  const [isLoadingScript, setIsLoadingScript] = useState(true);
+  
+  // sequenceState is used to control InteractionModal (e.g., 'waiting' for input)
+  const [sequenceState, setSequenceState] = useState('init'); 
+  const [currentQuestion, setCurrentQuestion] = useState(null);
+  const [isTalking, setIsTalking] = useState(false);
+  const [audioIntensity, setAudioIntensity] = useState(0);
+  const audioRef = useRef(null);
+  const audioCtxRef = useRef(null);
+  const analyserRef = useRef(null);
+  const sourceNodeRef = useRef(null);
+  const reqAnimRef = useRef(null);
+
+  // Fetch Dynamic Script
+  useEffect(() => {
+    let isMounted = true;
+    const fetchScript = async () => {
+      try {
+        const res = await fetch(`/speech/avatar/script/${surveyId}/${language}`);
+        if (!res.ok) throw new Error("Failed to fetch script");
+        const data = await res.json();
+        if (isMounted) {
+          setScript(data.script);
+          setIsLoadingScript(false);
+          setScriptIndex(0); // Start the script
+        }
+      } catch (err) {
+        console.error("Error fetching avatar script:", err);
+        // Fallback or exit if script fails completely
+        if (isMounted) onExit();
+      }
+    };
+    fetchScript();
+    return () => { isMounted = false; };
+  }, [surveyId, language]);
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (reqAnimRef.current) cancelAnimationFrame(reqAnimRef.current);
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      window.speechSynthesis.cancel();
+      setAudioIntensity(0);
+    };
+  }, []);
+
+  // Play an audio ID with jaw sync
+  const playAudio = async (audioId, fallbackText) => {
+    return new Promise(async (resolve) => {
+      if (!audioId) {
+        if (fallbackText) await speak(fallbackText, language);
+        return resolve();
+      }
+
+      try {
+        const url = `/speech/audio/${surveyId}/${audioId}`;
+        const audio = new Audio(url);
+        audioRef.current = audio;
+
+        audio.onended = () => {
+          if (reqAnimRef.current) cancelAnimationFrame(reqAnimRef.current);
+          setAudioIntensity(0);
+          resolve();
+        };
+
+        audio.onerror = async () => {
+          console.error("Audio playback failed:", audioId);
+          if (reqAnimRef.current) cancelAnimationFrame(reqAnimRef.current);
+          setAudioIntensity(0);
+          if (fallbackText) await speak(fallbackText, language);
+          resolve();
+        };
+
+        // Try setting up Analyser
+        try {
+          if (!audioCtxRef.current) {
+            audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+            analyserRef.current = audioCtxRef.current.createAnalyser();
+            analyserRef.current.fftSize = 256;
+          }
+          if (audioCtxRef.current.state === 'suspended') {
+            await audioCtxRef.current.resume();
+          }
+          if (!sourceNodeRef.current || sourceNodeRef.current.mediaElement !== audio) {
+            sourceNodeRef.current = audioCtxRef.current.createMediaElementSource(audio);
+            sourceNodeRef.current.connect(analyserRef.current);
+            analyserRef.current.connect(audioCtxRef.current.destination);
+          }
+
+          const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+          const updateIntensity = () => {
+            if (!analyserRef.current) return;
+            analyserRef.current.getByteFrequencyData(dataArray);
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+            setAudioIntensity((sum / dataArray.length) / 255);
+            reqAnimRef.current = requestAnimationFrame(updateIntensity);
+          };
+
+          audio.play().then(() => {
+            updateIntensity();
+          }).catch(async (e) => {
+            console.error("Audio play caught:", e);
+            if (fallbackText) await speak(fallbackText, language);
+            resolve();
+          });
+        } catch (ctxErr) {
+          console.error("AudioContext setup failed, playing without jaw sync", ctxErr);
+          audio.play().catch(async (e) => {
+            if (fallbackText) await speak(fallbackText, language);
+            resolve();
+          });
+        }
+      } catch (err) {
+        console.error("Audio block failed", err);
+        if (fallbackText) await speak(fallbackText, language);
+        resolve();
+      }
+    });
+  };
+
+  // Main Script Executor
+  useEffect(() => {
+    let isMounted = true;
+
+    const runScriptNode = async () => {
+      if (scriptIndex < 0 || scriptIndex >= script.length) return;
+      
+      const node = script[scriptIndex];
+      
+      // If we are at a question node, we must first check skip logic
+      if (node.step === 'question') {
+        const targetQ = questions.find(q => q.qid === node.qid);
+        if (targetQ && !shouldShowField(targetQ, answers)) {
+          // Skip this question AND its instruction
+          let nextIdx = scriptIndex + 1;
+          if (nextIdx < script.length && script[nextIdx].step === 'instruction') {
+            nextIdx++;
+          }
+          setScriptIndex(nextIdx);
+          return;
+        }
+        
+        setCurrentQuestion(targetQ);
+      }
+
+      setIsTalking(true);
+      setSequenceState('speaking');
+
+      if (node.step === 'greeting' || node.step === 'outro' || node.step === 'instruction') {
+        await playAudio(node.audioId, node.fallbackText);
+      } else if (node.step === 'question') {
+        await playAudio(node.audioId, node.fallbackText);
+      }
+
+      if (!isMounted) return;
+      setIsTalking(false);
+
+      // Transition logic
+      if (node.step === 'greeting' || node.step === 'question') {
+        // Move immediately to next node (which is usually instruction or next question)
+        setScriptIndex(prev => prev + 1);
+      } else if (node.step === 'instruction') {
+        // Wait for user input
+        setSequenceState('waiting');
+      } else if (node.step === 'outro') {
+        setSequenceState('finished');
+        setTimeout(() => {
+          if (isMounted) onComplete();
+        }, 1000);
+      }
+    };
+
+    if (!isLoadingScript) {
+      runScriptNode();
+    }
+
+    return () => { isMounted = false; };
+  }, [scriptIndex, isLoadingScript]);
+
+  // Empty replacement, advanceToNextQuestion is handled by script logic now
+
+  const handleAnswer = (answerData) => {
+    if (!currentQuestion) return;
+    
+    setAnswers(prev => ({ ...prev, [currentQuestion.qid]: answerData }));
+    
+    // Stop any ongoing speech if they answered early
+    window.speechSynthesis.cancel();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      if (audioRef.current.onended) audioRef.current.onended(); // Trigger resolve
+    }
+    if (reqAnimRef.current) cancelAnimationFrame(reqAnimRef.current);
+    setIsTalking(false);
+    setAudioIntensity(0);
+    
+    // Move to next node after answering (usually the next question)
+    setScriptIndex(prev => prev + 1);
+  };
+
+  const handleAudioRecorded = (audioBlob) => {
+    // For text questions, we store the blob in the answers.
+    // The parent component (SurveyPage) will need to handle file uploads.
+    // We store it as a special object { isAudioBlob: true, blob: audioBlob }
+    handleAnswer({ isAudioBlob: true, blob: audioBlob });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black flex flex-col">
+      {/* Top Half - Avatar */}
+      <div className="relative w-full h-[50vh] flex-shrink-0">
+        <button 
+          onClick={onExit}
+          className="absolute top-6 right-6 z-20 w-10 h-10 rounded-full bg-black/20 hover:bg-black/40 backdrop-blur-md text-white flex items-center justify-center transition-colors"
+        >
+          <X size={20} />
+        </button>
+        <AvatarCanvas isTalking={isTalking} audioIntensity={audioIntensity} />
+      </div>
+
+      {/* Bottom Half - Interaction Modal */}
+      <div className="w-full h-[50vh] relative bg-surface-alt">
+        <InteractionModal 
+          question={currentQuestion}
+          language={language}
+          onAnswer={handleAnswer}
+          onAudioRecorded={handleAudioRecorded}
+          isListening={sequenceState !== 'waiting' && sequenceState !== 'finished'}
+        />
+      </div>
+    </div>
+  );
+}

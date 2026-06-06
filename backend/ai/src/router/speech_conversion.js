@@ -47,6 +47,12 @@ speech_conversion_router.get('/audio/:surveyId/:audioId', (req, res) => {
     if (audioId.endsWith('.mp3')) {
         audioId = audioId.slice(0, -4);
     }
+    
+    // Check if it's a static avatar audio
+    if (audioId.startsWith('static_')) {
+        surveyId = 'avatar-statics';
+    }
+
     const objectName = `${surveyId}/${audioId}.mp3`;
 
     minioClient.getObject(bucketName, objectName, (err, stream) => {
@@ -58,6 +64,53 @@ speech_conversion_router.get('/audio/:surveyId/:audioId', (req, res) => {
         res.setHeader('Content-Type', 'audio/mpeg');
         stream.pipe(res);
     });
+});
+
+// Avatar Dynamic Script Route
+speech_conversion_router.get('/avatar/script/:surveyId/:language', async (req, res) => {
+    try {
+        const { surveyId, language } = req.params;
+        const survey = await Survey.findOne({ surveyId });
+        
+        if (!survey) {
+            return res.status(404).json({ error: "Survey not found" });
+        }
+
+        const script = [];
+        script.push({ step: "greeting", audioId: `static_greeting_${language}` });
+
+        for (const section of survey.questionSections) {
+            for (const question of section.questions) {
+                // Determine if there is pre-generated audio for this question
+                let qAudioId = null;
+                if (question.audio && question.audio.get(language)) {
+                    qAudioId = question.audio.get(language);
+                }
+
+                // Add Question Audio Node
+                script.push({
+                    step: "question",
+                    qid: question.qid,
+                    questionType: question.type,
+                    audioId: qAudioId,
+                    fallbackText: question.text.get(language) || question.text.get("english")
+                });
+
+                // Add Instruction Audio Node
+                script.push({
+                    step: "instruction",
+                    audioId: `static_${question.type}_${language}`
+                });
+            }
+        }
+
+        script.push({ step: "outro", audioId: `static_outro_${language}` });
+
+        return res.json({ script });
+    } catch (e) {
+        logger.error("Error generating avatar script:", e);
+        res.status(500).json({ error: "Failed to generate script" });
+    }
 });
 
 speech_conversion_router.get("/generate_audio/:surveyId", async (req, res) => {

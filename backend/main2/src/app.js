@@ -9,6 +9,7 @@ import responseRoute from "./routes/responseRoute.js";
 import demographicRoute from "./routes/demographicRoute.js";
 import campaignRoute from "./routes/campaignRoute.js";
 import notificationRoute from "./routes/notificationRoute.js";
+import avatarRoute from "./routes/avatarRoute.js";
 import { verifyJWT } from "./middleware/verifyJWT.js";
 
 const app = express();
@@ -39,6 +40,7 @@ app.use('/api/response', responseRoute);
 app.use('/api/demographic', demographicRoute);
 app.use('/api/campaign', campaignRoute);
 app.use('/api/notifications', notificationRoute);
+app.use('/api/avatar', avatarRoute);
 
 // Health check
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
