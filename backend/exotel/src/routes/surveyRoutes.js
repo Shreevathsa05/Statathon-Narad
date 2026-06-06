@@ -1,22 +1,32 @@
 import express from "express";
 import {
-  initiateCall,
+  triggerIvrSurvey,
   handleCallConnect,
-  handleRecording,
+  handleAnswer,
+  handleCallStatus,
+  proxyAudio
 } from "../controllers/callController.js";
 
 const router = express.Router();
 
-// Route you call to trigger the system
-// POST http://localhost:3000/api/survey/start-call
-router.post("/start-call", initiateCall);
+// Route you call from frontend to trigger the system
+// POST http://localhost:4000/api/survey/trigger-ivr-survey
+router.post("/trigger-ivr-survey", triggerIvrSurvey);
 
-// Webhook 1: Exotel asks what to do when the call connects
+// Webhook 1: Twilio asks what to do when the call connects
 // POST <ngrok-url>/api/survey/webhook/start
 router.post("/webhook/start", handleCallConnect);
 
-// Webhook 2: Exotel sends the recording details here
-// POST <ngrok-url>/api/survey/webhook/save-recording
-router.post("/webhook/save-recording", handleRecording);
+// Webhook 2: Twilio sends the recording details here after every question
+// POST <ngrok-url>/api/survey/webhook/answer
+router.post("/webhook/answer", handleAnswer);
+
+// Webhook 3: StatusCallback for call drops/hangups
+// POST <ngrok-url>/api/survey/webhook/status
+router.post("/webhook/status", handleCallStatus);
+
+// Audio Proxy: Proxies audio from AI service MinIO to Twilio
+// GET <ngrok-url>/api/survey/proxy-audio
+router.get("/proxy-audio", proxyAudio);
 
 export default router;

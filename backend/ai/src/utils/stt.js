@@ -40,7 +40,7 @@ export default async function stt_from_twilio_whisper(url) {
         filename = await downloadRecording(recordingSid);
 
         transcription = await stt(filename);
-        fs.unlinkSync(filename);
+        if (filename) fs.unlinkSync(filename);
     } catch (error) {
         logger.error("Error in stt_from_twilio_whisper:", error);
         if (filename && fs.existsSync(filename)) {
@@ -67,7 +67,7 @@ export async function stt_from_twilio_sarvam(url) {
             model: "saaras:v3",
             mode: "transcribe"
         });
-        fs.unlinkSync(filename);
+        if (filename) fs.unlinkSync(filename);
     } catch (error) {
         logger.error("Error in stt_from_twilio_sarvam:", error);
         if (filename && fs.existsSync(filename)) {
