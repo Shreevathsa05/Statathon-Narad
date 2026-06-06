@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Volume2 } from "lucide-react";
+import { Volume2, Loader2 } from "lucide-react";
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import DynamicField from "../components/survey/DynamicField";
 import { shouldShowField } from "../utils/ConditionEvaluator";
 import { BASE_URL, START_TIME } from "../constants";
@@ -24,6 +25,7 @@ export default function SurveyPage() {
     const [errors, setErrors] = useState("");
     const [loading, setLoading] = useState(true);
     const [submitLoading, setSubmitLoading] = useState(false);
+    const [submitSuccess, setSubmitSuccess] = useState(false);
 
     const [questionSections, setQuestionSections] = useState([]);
     const [answers, setAnswers] = useState({});
@@ -215,7 +217,10 @@ export default function SurveyPage() {
                 return;
             }
 
-            navigate("/");
+            setSubmitSuccess(true);
+            setTimeout(() => {
+                navigate("/");
+            }, 3500);
         } catch {
             setErrors("Something went wrong");
         } finally {
@@ -385,15 +390,34 @@ export default function SurveyPage() {
                 <div className="flex justify-end pt-6 pb-12 border-t border-border mt-8">
                     <button
                         onClick={handleSubmit}
-                        disabled={submitLoading || loading}
-                        className={`inline-flex items-center justify-center px-6 h-10 text-[14px] font-medium rounded-md transition-colors
-                            ${submitLoading || loading ? "bg-border text-text-muted cursor-not-allowed" : "bg-black text-white hover:bg-gray-800 shadow-[0_4px_14px_0_rgb(0,0,0,0.1)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.15)]"}
+                        disabled={submitLoading || loading || submitSuccess}
+                        className={`inline-flex items-center justify-center px-6 h-10 text-[14px] font-medium rounded-md transition-all duration-300
+                            ${(submitLoading || loading || submitSuccess) ? "bg-border text-text-muted cursor-not-allowed" : "bg-black text-white hover:bg-gray-800 shadow-[0_4px_14px_0_rgb(0,0,0,0.1)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.15)]"}
                         `}
                     >
-                        {submitLoading ? "Submitting..." : "Submit Survey"}
+                        Submit Survey
                     </button>
                 </div>
             </main>
+
+            {/* Loading / Success Overlay */}
+            {(submitLoading || submitSuccess) && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/50 backdrop-blur-sm transition-opacity duration-300">
+                    <div className="bg-white p-8 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-[#E5E5E5] flex flex-col items-center justify-center min-w-[300px]">
+                        {submitSuccess ? (
+                            <DotLottieReact src="/success-tick.lottie" autoplay loop className="w-24 h-24" />
+                        ) : (
+                            <Loader2 className="w-16 h-16 animate-spin text-black" />
+                        )}
+                        <h2 className="mt-6 text-xl font-semibold text-black tracking-tight">
+                            {submitSuccess ? "Response Recorded!" : "Submitting..."}
+                        </h2>
+                        <p className="text-sm text-text-muted mt-2">
+                            {submitSuccess ? "Redirecting to home page..." : "Please wait while we save your response."}
+                        </p>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
