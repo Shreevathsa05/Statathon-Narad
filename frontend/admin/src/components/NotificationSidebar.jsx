@@ -56,10 +56,10 @@ export default function NotificationSidebar() {
           ) : (
             <>
               {/* Unread Section */}
-              {notifications.filter(n => !n.readBy.includes(user?.userId || user?._id)).length > 0 && (
+              {notifications.filter(n => !n.readBy.includes(user?.userId || user?._id || user?.id)).length > 0 && (
                 <div className="flex flex-col gap-3">
                   <h3 className="text-xs font-semibold text-[#A3A3A3] uppercase tracking-wider px-1">New</h3>
-                  {notifications.filter(n => !n.readBy.includes(user?.userId || user?._id)).map(notif => (
+                  {notifications.filter(n => !n.readBy.includes(user?.userId || user?._id || user?.id)).map(notif => (
                     <div 
                       key={notif._id}
                       className="relative p-4 rounded-md border text-sm transition-all duration-200 bg-[#FFFFFF] border-[#D4D4D4] shadow-sm"
@@ -99,10 +99,10 @@ export default function NotificationSidebar() {
               )}
 
               {/* Read Section */}
-              {notifications.filter(n => n.readBy.includes(user?.userId || user?._id)).length > 0 && (
+              {notifications.filter(n => n.readBy.includes(user?.userId || user?._id || user?.id)).length > 0 && (
                 <div className="flex flex-col gap-3 pt-2">
                   <h3 className="text-xs font-semibold text-[#A3A3A3] uppercase tracking-wider px-1">Earlier</h3>
-                  {notifications.filter(n => n.readBy.includes(user?.userId || user?._id)).map(notif => (
+                  {notifications.filter(n => n.readBy.includes(user?.userId || user?._id || user?.id)).map(notif => (
                     <div 
                       key={notif._id}
                       className="relative p-4 rounded-md border text-sm transition-all duration-200 bg-[#F7F7F7] border-[#E5E5E5] opacity-60 hover:opacity-100"

@@ -55,8 +55,40 @@ export default function UsersPage() {
         </div>
 
         {loading ? (
-          <div className="flex justify-center p-12">
-            <span className="w-5 h-5 border-2 border-border border-t-text-primary rounded-full animate-spin" />
+          <div className="w-full flex flex-col mt-4">
+            {/* Header Skeleton */}
+            <div className="flex items-center px-4 pb-4 border-b border-border">
+              <div className="h-4 bg-border/40 rounded w-[30%] animate-pulse"></div>
+              <div className="h-4 bg-border/40 rounded w-[20%] animate-pulse"></div>
+              <div className="h-4 bg-border/40 rounded w-[20%] animate-pulse"></div>
+              <div className="h-4 bg-border/40 rounded w-[15%] animate-pulse"></div>
+              <div className="h-4 bg-border/40 rounded w-[15%] animate-pulse"></div>
+            </div>
+            
+            {/* Rows Skeleton fading down */}
+            {[100, 85, 70, 50, 30, 15].map((op, i) => (
+              <div key={i} className="flex items-center px-4 py-4 border-b border-border/30" style={{ opacity: op / 100 }}>
+                <div className="flex items-center gap-3 w-[30%]">
+                  <div className="h-8 w-8 rounded-full bg-border/50 animate-pulse shrink-0"></div>
+                  <div className="flex flex-col gap-2 w-full">
+                    <div className="h-3.5 bg-border/50 rounded w-24 animate-pulse"></div>
+                    <div className="h-2.5 bg-border/30 rounded w-32 animate-pulse"></div>
+                  </div>
+                </div>
+                <div className="w-[20%]">
+                  <div className="h-3.5 bg-border/50 rounded w-20 animate-pulse"></div>
+                </div>
+                <div className="w-[20%]">
+                  <div className="h-3.5 bg-border/50 rounded w-24 animate-pulse"></div>
+                </div>
+                <div className="w-[15%]">
+                  <div className="h-5 bg-border/50 rounded-full w-14 animate-pulse"></div>
+                </div>
+                <div className="w-[15%] flex justify-end">
+                  <div className="h-8 bg-border/50 rounded w-8 animate-pulse"></div>
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
           <UserTable 

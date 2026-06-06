@@ -45,19 +45,19 @@ The delivery bot replaces the variable in real-time, building instant rapport.
 ### AI Survey Generation vs Delivery Execution
 ```mermaid
 graph TD
-    subgraph SDRD - AI Survey Creation Phase
+    subgraph SDRD ["AI Survey Creation Phase"]
     Agent[AI Section Planner & Question Gen] -->|Generates Complex Rules| SurveyDoc[(Survey JSON)]
     SurveyDoc -->|Contains Block-Level showIf| SurveyDoc
     SurveyDoc -->|Contains Templated Text| SurveyDoc
     end
 
-    subgraph FOD - Survey Delivery Phase (Telegram/Web)
+    subgraph FOD ["Survey Delivery Phase (Telegram/Web)"]
     SurveyDoc --> Deliver[Delivery Engine]
     User[Citizen] -->|Answers Q1 'Mechanic'| Deliver
     Deliver -->|Evaluates Complex showIf| Engine{Rule Engine}
     Engine -->|Traits matched| RouteA[Route to Section C]
     Engine -->|Traits unmatched| RouteB[Route to Section B]
-    RouteA --> Template[Inject {{q1}} into Q4 Text]
+    RouteA --> Template["Inject {{q1}} into Q4 Text"]
     Template --> User
     end
 ```

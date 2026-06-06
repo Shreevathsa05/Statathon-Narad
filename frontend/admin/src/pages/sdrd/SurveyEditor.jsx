@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { surveyClient } from '../../api/survey';
 import { aiClient } from '../../api/aiClient';
-import { ArrowLeft, Sparkles, CheckCircle2, AlertCircle, Save, X, Loader2, Globe, Check, Edit2, Trash2, Volume2, AudioLines } from 'lucide-react';
+import { ArrowLeft, Sparkles, CheckCircle2, AlertCircle, Save, X, Loader2, Globe, Check, Edit2, Trash2, Volume2, AudioLines, Bell, GitBranch, Plus, MoreVertical } from 'lucide-react';
 import { useToast } from '../../context/ToastContext.jsx';
+import { useNotification } from '../../context/NotificationContext.jsx';
+import NotificationSidebar from '../../components/NotificationSidebar.jsx';
 
 const TypewriterMessage = ({ content, isList = false }) => {
   const [visibleCount, setVisibleCount] = useState(0);
@@ -91,6 +93,7 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
   const surveyId = propSurveyId || paramSurveyId;
   const navigate = useNavigate();
   const toast = useToast();
+  const { fetchInitialNotifications, unreadCount, toggleSidebar } = useNotification();
 
   const [survey, setSurvey] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -98,9 +101,12 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
   const [saving, setSaving] = useState(false);
   const [approving, setApproving] = useState(false);
 
-  // Editable local state
+  const [isLogicMode, setIsLogicMode] = useState(false);
+  const [showActionMenu, setShowActionMenu] = useState(false);
   const [localTitle, setLocalTitle] = useState('');
+  const [localDescription, setLocalDescription] = useState('');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [showDescPanel, setShowDescPanel] = useState(false);
   const [localSections, setLocalSections] = useState([]);
   const [hasChanges, setHasChanges] = useState(false);
   const [editingSections, setEditingSections] = useState({}); // Track edit mode per section
@@ -154,6 +160,7 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
       try {
         await surveyClient.deleteSurvey(surveyId);
         toast.success("Survey deleted successfully");
+        fetchInitialNotifications();
         navigate('/sdrd');
       } catch (err) {
         setShowErrorModal("Failed to delete survey: " + err.message);
@@ -210,6 +217,7 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
       const surveyData = res.data.data;
       setSurvey(surveyData);
       setLocalTitle(surveyData.name || '');
+      setLocalDescription(surveyData.description || '');
       setLocalSections(surveyData.questionSections || []);
       // Reset selected langs when fetching fresh survey
       setSelectedLangs([]);
@@ -296,6 +304,8 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
     try {
       setApproving(true);
       await surveyClient.approveSurvey(surveyId);
+      toast.success("Survey approved successfully");
+      fetchInitialNotifications();
       navigate('/sdrd');
     } catch (err) {
       setShowErrorModal("Failed to approve survey.");
@@ -313,8 +323,8 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
     
     try {
       setSaving(true);
-      await surveyClient.updateSurvey(surveyId, { name: localTitle, questionSections: localSections });
-      setSurvey(prev => ({ ...prev, name: localTitle, questionSections: localSections }));
+      await surveyClient.updateSurvey(surveyId, { name: localTitle, description: localDescription, questionSections: localSections });
+      setSurvey(prev => ({ ...prev, name: localTitle, description: localDescription, questionSections: localSections }));
       setHasChanges(false);
       toast.success("Changes saved as draft");
     } catch (err) {
@@ -592,19 +602,33 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
   const hasTranslations = survey.supportedLanguages && survey.supportedLanguages.length > 1;
   const allQuestions = survey?.questionSections?.flatMap(s => s.questions) || [];
   const hasAudioGenerated = allQuestions.some(q => q.audio && Object.values(q.audio).some(audioStr => audioStr && audioStr.trim() !== ""));
+  const hasLogicConfigured = allQuestions.some(q => q.showIf && q.showIf.questionId);
   const isTranslationLocked = translateStatus === 'processing' || audioGenerationStatus === 'processing' || hasTranslations || hasAudioGenerated;
 
   return (
     <div className="flex flex-col flex-1 min-w-0 bg-bg">
-      {/* Sticky Header for Back Button */}
+      {/* Sticky Header for Back Button & Notifications */}
       <div className="bg-bg border-b border-border">
-        {/* Full-width container for the back button */}
-        <div className="w-full px-8 pt-6 pb-2">
+        {/* Full-width container */}
+        <div className="w-full px-8 py-4 flex items-center justify-between">
           <button 
             className="inline-flex items-center gap-2 text-sm font-medium text-text-muted hover:text-text-primary transition-colors"
             onClick={() => navigate('/sdrd')}
           >
             <ArrowLeft size={16} /> Back to Dashboard
+          </button>
+
+          {/* Notification Bell */}
+          <button 
+            onClick={toggleSidebar}
+            className="relative p-1.5 text-text-secondary hover:text-text-primary hover:bg-black/5 rounded-md transition-colors"
+          >
+            <Bell size={18} />
+            {unreadCount > 0 && (
+              <span className="absolute top-0 right-0 transform translate-x-1/4 -translate-y-1/4 flex items-center justify-center min-w-[16px] h-4 px-1 bg-red-500 text-white text-[10px] font-bold rounded-full border border-bg shadow-sm">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
           </button>
         </div>
       </div>
@@ -635,17 +659,19 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-3 mb-2 group flex-wrap">
-              <h1 className="text-2xl font-bold tracking-tight text-text-primary break-words m-0">{localTitle}</h1>
-              {isPending && (
-                <button
-                  className="inline-flex items-center justify-center gap-1.5 px-2.5 h-7 text-xs font-medium rounded bg-surface border border-border text-text-muted hover:bg-surface-alt hover:text-text-primary transition-colors shrink-0"
-                  onClick={() => setIsEditingTitle(true)}
-                  disabled={isTranslationLocked || saving || approving}
-                >
-                  <Edit2 size={14} /> Edit Title
-                </button>
-              )}
+            <div className="flex flex-col gap-1 mb-2">
+              <div className="flex items-center gap-3 group flex-wrap">
+                <h1 className="text-2xl font-bold tracking-tight text-text-primary break-words m-0">{localTitle}</h1>
+                {isPending && (
+                  <button
+                    className="inline-flex items-center justify-center gap-1.5 px-2.5 h-7 text-xs font-medium rounded bg-surface border border-border text-text-muted hover:bg-surface-alt hover:text-text-primary transition-colors shrink-0"
+                    onClick={() => !isLogicMode && setIsEditingTitle(true)}
+                    disabled={isTranslationLocked || saving || approving || isLogicMode}
+                  >
+                    <Edit2 size={14} /> Edit Title
+                  </button>
+                )}
+              </div>
             </div>
           )}
           <div className="flex items-center gap-4 mt-2">
@@ -659,7 +685,7 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
         </div>
 
         {isPending && (
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-3 shrink-0 relative">
             {hasChanges && (
               <button className="inline-flex items-center justify-center gap-2 px-4 h-9 text-sm font-medium rounded-md bg-white border border-border text-text-primary hover:bg-surface-alt transition-colors disabled:opacity-50 shrink-0 whitespace-nowrap" onClick={handleManualSave} disabled={saving || translateStatus === 'processing' || hasAudioGenerated} title={hasAudioGenerated ? "Survey is locked after audio generation" : ""}>
                 {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
@@ -667,24 +693,70 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
               </button>
             )}
             <button 
-              className="inline-flex items-center justify-center gap-2 px-4 h-9 text-sm font-medium rounded-md bg-white border border-border text-text-primary hover:bg-surface-alt transition-colors disabled:opacity-50 shrink-0 whitespace-nowrap" 
-              onClick={() => setShowAudioModal(true)} 
-              disabled={audioGenerationStatus === 'processing' || translateStatus === 'processing' || hasAudioGenerated}
+              className={`inline-flex items-center justify-center gap-2 px-4 h-9 text-sm font-medium rounded-md border transition-colors disabled:opacity-50 shrink-0 whitespace-nowrap ${
+                isLogicMode 
+                  ? 'bg-geist-blue/10 border-geist-blue/20 text-geist-blue hover:bg-geist-blue/20' 
+                  : 'bg-white border-border text-text-primary hover:bg-surface-alt'
+              }`}
+              onClick={() => {
+                setIsLogicMode(!isLogicMode);
+                if (!isLogicMode) {
+                  setEditingSections({});
+                  setShowDescPanel(false);
+                  setIsEditingTitle(false);
+                  toast.info("Entered Logic Mode. Structural editing is locked.");
+                } else {
+                  toast.success("Exited Logic Mode");
+                }
+              }} 
+              disabled={translateStatus === 'processing' || audioGenerationStatus === 'processing' || hasAudioGenerated} 
               title={hasAudioGenerated ? "Survey is locked after audio generation" : ""}
             >
-              {audioGenerationStatus === 'processing' ? <Loader2 size={16} className="animate-spin" /> : <AudioLines size={16} />}
-              Generate Audio
-            </button>
-            <button className="inline-flex items-center justify-center gap-2 px-4 h-9 text-sm font-medium rounded-md bg-white border border-border text-text-primary hover:bg-surface-alt transition-colors disabled:opacity-50 shrink-0 whitespace-nowrap" onClick={() => setShowLangPanel(!showLangPanel)} disabled={translateStatus === 'processing' || audioGenerationStatus === 'processing' || hasAudioGenerated} title={hasAudioGenerated ? "Survey is locked after audio generation" : ""}>
-              <Globe size={16} /> Translate
-            </button>
-            <button className="inline-flex items-center justify-center gap-2 px-4 h-9 text-sm font-medium rounded-md bg-white border border-geist-error text-geist-error hover:bg-geist-error/10 transition-colors disabled:opacity-50 shrink-0 whitespace-nowrap" onClick={() => setDeleteModal({ show: true, type: 'survey', message: 'Are you sure you want to delete this entire survey? This action cannot be undone.' })} disabled={translateStatus === 'processing' || audioGenerationStatus === 'processing'}>
-              <Trash2 size={16} /> Delete Survey
+              <GitBranch size={16} /> {isLogicMode ? 'Exit Logic Mode' : 'Logic Mode'}
             </button>
             <button className="inline-flex items-center justify-center gap-2 px-4 h-9 text-sm font-medium rounded-md bg-black text-white hover:bg-neutral-800 transition-colors disabled:opacity-50 shrink-0 whitespace-nowrap" onClick={() => setShowApproveModal(true)} disabled={approving || translateStatus === 'processing'}>
               {approving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-              Approve Survey
+              Approve
             </button>
+            
+            <div className="relative">
+              <button 
+                className="inline-flex items-center justify-center w-9 h-9 rounded-md bg-white border border-border text-text-primary hover:bg-surface-alt transition-colors disabled:opacity-50 shrink-0" 
+                onClick={() => setShowActionMenu(!showActionMenu)}
+              >
+                <MoreVertical size={16} />
+              </button>
+              
+              {showActionMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowActionMenu(false)} />
+                  <div className="absolute right-0 top-[calc(100%+8px)] w-56 bg-white border border-border rounded-md shadow-[0_4px_6px_rgba(0,0,0,0.07),0_2px_4px_rgba(0,0,0,0.06)] py-1 z-50 flex flex-col">
+                    <button 
+                      className="w-full text-left px-4 py-2.5 text-sm text-text-primary hover:bg-black/5 flex items-center gap-2.5 disabled:opacity-50 transition-colors"
+                      onClick={() => { setShowActionMenu(false); setShowAudioModal(true); }}
+                      disabled={audioGenerationStatus === 'processing' || translateStatus === 'processing' || hasAudioGenerated}
+                    >
+                      {audioGenerationStatus === 'processing' ? <Loader2 size={15} className="animate-spin" /> : <AudioLines size={15} />} Generate Audio
+                    </button>
+                    <button 
+                      className="w-full text-left px-4 py-2.5 text-sm text-text-primary hover:bg-black/5 flex items-center gap-2.5 disabled:opacity-50 transition-colors"
+                      onClick={() => { setShowActionMenu(false); setShowLangPanel(!showLangPanel); }}
+                      disabled={translateStatus === 'processing' || audioGenerationStatus === 'processing' || hasAudioGenerated}
+                    >
+                      <Globe size={15} /> Translate Survey
+                    </button>
+                    <div className="h-px bg-border my-1 mx-2"></div>
+                    <button 
+                      className="w-full text-left px-4 py-2.5 text-sm font-medium text-geist-error hover:bg-geist-error/10 flex items-center gap-2.5 disabled:opacity-50 transition-colors"
+                      onClick={() => { setShowActionMenu(false); setDeleteModal({ show: true, type: 'survey', message: 'Are you sure you want to delete this entire survey? This action cannot be undone.' }); }}
+                      disabled={translateStatus === 'processing' || audioGenerationStatus === 'processing'}
+                    >
+                      <Trash2 size={15} /> Delete Survey
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -692,6 +764,62 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
       {/* Main Content */}
       <div className="flex flex-col flex-1 w-full max-w-[1200px] mx-auto px-6 pb-16 pt-6">
       
+      {/* Description Panel */}
+      {showDescPanel ? (
+        <div className="bg-surface-alt border border-border rounded-md p-6 mb-8 w-full">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold tracking-tight m-0">Survey Description</h3>
+            <button className="inline-flex items-center justify-center w-8 h-8 rounded text-text-muted hover:bg-black/5 hover:text-text-primary transition-colors" onClick={() => setShowDescPanel(false)}>
+              <X size={16} />
+            </button>
+          </div>
+          <div className="flex flex-col gap-4">
+            <textarea 
+              className="w-full px-4 py-3 bg-white border border-border rounded-md text-sm text-text-primary focus:outline-none focus:border-geist-blue transition-colors min-h-[120px] resize-y"
+              value={localDescription}
+              onChange={(e) => {
+                setLocalDescription(e.target.value);
+                setHasChanges(true);
+              }}
+              placeholder="Enter an optional description for this survey..."
+              autoFocus
+            />
+            <div className="flex justify-end">
+              <button 
+                className="inline-flex items-center justify-center gap-1.5 px-5 h-9 text-sm font-medium rounded-md bg-black text-white hover:bg-neutral-800 transition-colors"
+                onClick={() => setShowDescPanel(false)}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-surface border border-border rounded-md p-6 mb-8 w-full">
+          <div className="flex justify-between items-start mb-3">
+            <h3 className="text-lg font-semibold tracking-tight m-0">Survey Description</h3>
+            {isPending && (
+              <button
+                className="inline-flex items-center justify-center gap-1.5 px-3 h-8 text-xs font-medium rounded bg-surface border border-border text-text-muted hover:bg-surface-alt hover:text-text-primary transition-colors shrink-0"
+                onClick={() => setShowDescPanel(true)}
+                disabled={isTranslationLocked || saving || approving || isLogicMode}
+              >
+                <Edit2 size={14} /> {localDescription ? 'Edit Description' : 'Add Description'}
+              </button>
+            )}
+          </div>
+          {localDescription ? (
+            <p className="text-[15px] text-text-primary leading-relaxed m-0 whitespace-pre-wrap">
+              {localDescription}
+            </p>
+          ) : (
+            <p className="text-sm text-text-muted italic m-0">
+              No description provided. Add one to give respondents more context.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Language Translation Panel */}
       {showLangPanel && (
         <div className="bg-surface-alt border border-border rounded-md p-6 mb-8">
@@ -781,14 +909,15 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
               
               {isPending && (
                 <div className="flex gap-2">
-                  {sec.sectionName === survey?.questionSections?.[secIdx]?.sectionName && sec.sectionName?.toLowerCase() !== 'demographics' && (
+                  {sec.sectionName === survey?.questionSections?.[secIdx]?.sectionName && sec.sectionName?.toLowerCase() !== 'demographics' && !isLogicMode && (
                     <button
                       className="inline-flex items-center gap-1.5 px-2.5 h-7 text-xs font-medium rounded text-geist-blue bg-geist-blue/10 border border-geist-blue/20 hover:bg-geist-blue/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={() => {
                         setActiveImproveSection(sec.sectionName);
                         setImproveInstructions('');
                       }}
-                      disabled={isTranslationLocked || improvingStatus === 'processing'}
+                      disabled={isTranslationLocked || improvingStatus === 'processing' || hasLogicConfigured}
+                      title={hasLogicConfigured ? "AI Improve disabled because Skip Logic is configured" : ""}
                     >
                       <Sparkles size={14} /> AI Improve
                     </button>
@@ -809,7 +938,7 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
                         <Save size={14} /> Save
                       </button>
                     </>
-                  ) : sec.sectionName?.toLowerCase() !== 'demographics' && (
+                  ) : sec.sectionName?.toLowerCase() !== 'demographics' && !isLogicMode && (
                     <button
                       className="inline-flex items-center gap-1.5 px-2.5 h-7 text-xs font-medium rounded bg-white border border-border text-text-primary hover:bg-surface-alt transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={() => setEditingSections(prev => ({ ...prev, [secIdx]: true }))}
@@ -870,6 +999,16 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
               <div className="px-6 py-2">
                 {sec.questions.map((q, qIdx) => {
                   const isActiveAudio = playingAudioId && playingAudioId === q.audio?.[viewLang];
+                  const previousQuestions = [];
+                  for (let i = 0; i <= secIdx; i++) {
+                    const sectionQuestions = localSections[i].questions;
+                    for (let j = 0; j < sectionQuestions.length; j++) {
+                      if (i === secIdx && j >= qIdx) break;
+                      if (sectionQuestions[j].type === 'mcq' || sectionQuestions[j].type === 'checkbox') {
+                         previousQuestions.push(sectionQuestions[j]);
+                      }
+                    }
+                  }
                   return (
                 <div key={q.qid} ref={isActiveAudio ? activeQuestionRef : null} className={`transition-all duration-300 ${isActiveAudio ? 'audio-glow-wrapper bg-bg shadow-sm rounded-md p-4 -mx-4 my-2 border border-transparent' : `py-4 ${qIdx === sec.questions.length - 1 ? '' : 'border-b border-border/50'}`}`}>
                   
@@ -959,6 +1098,93 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
                       )}
                     </div>
                   )}
+
+                  {/* Logic Mode Builder UI */}
+                  {isLogicMode && (
+                    <div className="mt-4 p-4 bg-surface-alt border border-border rounded-md shadow-sm ml-10">
+                      {!q.showIf ? (
+                        <button 
+                          onClick={() => {
+                            const updated = [...localSections];
+                            updated[secIdx].questions[qIdx].showIf = { questionId: '', equals: '' };
+                            setLocalSections(updated);
+                            setHasChanges(true);
+                          }}
+                          className="text-sm font-medium text-geist-blue hover:text-blue-600 transition-colors flex items-center gap-1"
+                        >
+                          <Plus size={14} /> Add Skip Logic
+                        </button>
+                      ) : (
+                        <div className="flex flex-col gap-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-semibold text-text-primary flex items-center gap-2">
+                              <GitBranch size={14} className="text-geist-blue" />
+                              Display Logic
+                            </span>
+                            <button 
+                              onClick={() => {
+                                const updated = [...localSections];
+                                delete updated[secIdx].questions[qIdx].showIf;
+                                setLocalSections(updated);
+                                setHasChanges(true);
+                              }}
+                              className="text-text-muted hover:text-geist-error transition-colors"
+                              title="Remove Logic"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                          
+                          <div className="flex flex-wrap items-center gap-3 text-sm text-text-primary">
+                            <span>Show this question if</span>
+                            <select 
+                              className="h-8 px-2 bg-white border border-border rounded-md text-sm focus:outline-none focus:border-geist-blue max-w-[200px] truncate"
+                              value={q.showIf.questionId || ''}
+                              onChange={(e) => {
+                                const updated = [...localSections];
+                                updated[secIdx].questions[qIdx].showIf.questionId = e.target.value;
+                                updated[secIdx].questions[qIdx].showIf.equals = ''; // reset option
+                                setLocalSections(updated);
+                                setHasChanges(true);
+                              }}
+                            >
+                              <option value="" disabled>Select Previous Question</option>
+                              {previousQuestions.map(pq => (
+                                <option key={pq.qid} value={pq.qid}>
+                                  {pq.text?.english?.substring(0, 40)}{pq.text?.english?.length > 40 ? '...' : ''}
+                                </option>
+                              ))}
+                            </select>
+                            
+                            <span>is</span>
+                            
+                            <select 
+                              className="h-8 px-2 bg-white border border-border rounded-md text-sm focus:outline-none focus:border-geist-blue max-w-[200px] truncate"
+                              value={q.showIf.equals || ''}
+                              onChange={(e) => {
+                                const updated = [...localSections];
+                                updated[secIdx].questions[qIdx].showIf.equals = e.target.value;
+                                setLocalSections(updated);
+                                setHasChanges(true);
+                              }}
+                              disabled={!q.showIf.questionId}
+                            >
+                              <option value="" disabled>Select Option</option>
+                              {q.showIf.questionId && previousQuestions.find(pq => pq.qid === q.showIf.questionId)?.options?.map(opt => (
+                                <option key={opt.id} value={opt.id}>
+                                  {opt.label?.english}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          
+                          {previousQuestions.length === 0 && (
+                            <p className="text-xs text-amber-600 mt-1">There are no previous multiple-choice questions to base logic on.</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )})}
               
@@ -984,7 +1210,7 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
           </div>
         )}
 
-        {isPending && (
+        {isPending && !isLogicMode && (
           <button 
             onClick={addSection}
             className="w-full h-14 rounded-md border-2 border-dashed border-border text-text-muted hover:border-text-primary hover:text-text-primary transition-colors flex items-center justify-center gap-2 font-medium bg-bg disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1082,6 +1308,8 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
       )}
 
       </div>
+
+      <NotificationSidebar />
     </div>
   );
 }
