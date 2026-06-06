@@ -1,9 +1,10 @@
 import { multilang_translator_agent } from "../models/agents.js";
 import { Survey } from "../mongodb/surveySchema.js";
 import { surveyLogs } from "../router/question_generation_route.js";
+import { logger } from "./logger.js";
 
 function pushLog(id, msg) {
-    console.log(msg);
+    logger.info(msg);
     if (!id) return;
     if (!surveyLogs.has(id)) surveyLogs.set(id, []);
     surveyLogs.get(id).push(msg);
@@ -11,7 +12,7 @@ function pushLog(id, msg) {
 
 export default async function translate_survey(surveyId, languages) {
     try {
-        console.log(`Starting translation for survey ${surveyId} into languages: ${languages.join(", ")}`);
+        logger.info(`Starting translation for survey ${surveyId} into languages: ${languages.join(", ")}`);
 
         const survey = await Survey.findOne({ surveyId });
         if (!survey) {
@@ -51,9 +52,9 @@ export default async function translate_survey(surveyId, languages) {
                         }
                     } catch (e) {
                         attempts++;
-                        console.error(`Attempt ${attempts} failed for question ${question.qid}: ${e.message}`);
+                        logger.error(`Attempt ${attempts} failed for question ${question.qid}: ${e.message}`);
                         if (attempts < maxAttempts) {
-                            console.log("Waiting 2 seconds before retrying...");
+                            logger.info("Waiting 2 seconds before retrying...");
                             await new Promise(r => setTimeout(r, 2000));
                         }
                     }
@@ -89,7 +90,7 @@ export default async function translate_survey(surveyId, languages) {
                         });
                     }
                 } else {
-                    console.warn(`Failed to translate question ${question.qid}. Keeping original.`);
+                    logger.warn(`Failed to translate question ${question.qid}. Keeping original.`);
                 }
 
                 // Ensure blank audio field for all languages
@@ -110,7 +111,7 @@ export default async function translate_survey(surveyId, languages) {
             });
         }
 
-        console.log(`Saving translated survey to MongoDB...`);
+        logger.info(`Saving translated survey to MongoDB...`);
 
         const updatedSurvey = await Survey.findOneAndUpdate(
             { surveyId },
@@ -124,11 +125,11 @@ export default async function translate_survey(surveyId, languages) {
             { new: true }
         );
 
-        console.log("Survey translation complete and saved!");
+        logger.info("Survey translation complete and saved!");
         return updatedSurvey;
 
     } catch (error) {
-        console.error("Error during survey translation:", error);
+        logger.error("Error during survey translation:", error);
 
         // Revert status on critical failure
         try {

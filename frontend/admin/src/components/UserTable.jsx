@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import RoleBadge from './RoleBadge.jsx';
 import { Users } from 'lucide-react';
+import ConfirmModal from './ConfirmModal.jsx';
 
 export default function UserTable({ users, onSuspend, onDelete }) {
+  const [confirmModal, setConfirmModal] = useState(null);
   if (!users || users.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 px-4 text-center bg-surface border border-dashed border-border rounded-md text-text-muted">
@@ -49,16 +52,26 @@ export default function UserTable({ users, onSuspend, onDelete }) {
                 <div className="flex items-center justify-end gap-2">
                   <button 
                     className="inline-flex items-center justify-center px-3 h-7 text-xs font-medium rounded text-text-muted hover:bg-surface-alt hover:text-text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
-                    onClick={() => onSuspend(u._id)}
+                    onClick={() => setConfirmModal({
+                      title: u.status === 'suspended' ? 'Reactivate User' : 'Suspend User',
+                      message: `Are you sure you want to ${u.status === 'suspended' ? 'reactivate' : 'suspend'} ${u.name}?`,
+                      confirmText: u.status === 'suspended' ? 'Reactivate' : 'Suspend',
+                      isDanger: u.status !== 'suspended',
+                      onConfirm: () => onSuspend(u._id)
+                    })}
                     disabled={u.role === 'admin'}
                   >
                     {u.status === 'suspended' ? 'Reactivate' : 'Suspend'}
                   </button>
                   <button 
                     className="inline-flex items-center justify-center px-3 h-7 text-xs font-medium rounded bg-geist-error/10 text-geist-error hover:bg-geist-error hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
-                    onClick={() => {
-                      if (window.confirm(`Delete user ${u.name}?`)) onDelete(u._id);
-                    }}
+                    onClick={() => setConfirmModal({
+                      title: 'Delete User',
+                      message: `Are you sure you want to permanently delete ${u.name}? This action cannot be undone.`,
+                      confirmText: 'Delete',
+                      isDanger: true,
+                      onConfirm: () => onDelete(u._id)
+                    })}
                     disabled={u.role === 'admin'}
                   >
                     Delete
@@ -69,6 +82,17 @@ export default function UserTable({ users, onSuspend, onDelete }) {
           ))}
         </tbody>
       </table>
+
+      {confirmModal && (
+        <ConfirmModal
+          title={confirmModal.title}
+          message={confirmModal.message}
+          confirmText={confirmModal.confirmText}
+          isDanger={confirmModal.isDanger}
+          onConfirm={confirmModal.onConfirm}
+          onClose={() => setConfirmModal(null)}
+        />
+      )}
     </div>
   );
 }

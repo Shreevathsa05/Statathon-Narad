@@ -141,6 +141,10 @@ const SurveySchema = new mongoose.Schema(
 			required: true,
 			trim: true,
 		},
+		description: {
+			type: String,
+			default: "",
+		},
 		status: {
 			type: String,
 			enum: [
@@ -156,8 +160,13 @@ const SurveySchema = new mongoose.Schema(
 		},
 		accessType: {
 			type: String,
-			enum: ["general", "targeted"],
-			default: "general",
+			enum: ["general", "targeted", null],
+			default: null,
+		},
+		targetSource: {
+			type: String,
+			enum: ["excel", "generated", null],
+			default: null,
 		},
 		supportedLanguages: {
 			type: [String],

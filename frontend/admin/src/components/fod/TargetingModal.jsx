@@ -8,14 +8,14 @@ import {
   Filter,
   Globe,
 } from "lucide-react";
-import { useToast } from '../../context/ToastContext.jsx';
-import { surveyClient } from '../../api/survey';
-import { campaignClient } from '../../api/campaign';
+import { useToast } from "../../context/ToastContext.jsx";
+import { surveyClient } from "../../api/survey";
+import { campaignClient } from "../../api/campaign";
 
 export default function TargetingModal({ survey, onClose, onUpdate }) {
   const toast = useToast();
 
-  const [accessType, setAccessType] = useState(survey.accessType || "general");
+  const [accessType, setAccessType] = useState(survey.accessType);
   const [isAccessDropdownOpen, setIsAccessDropdownOpen] = useState(false);
   const [savingAccessType, setSavingAccessType] = useState(false);
 
@@ -29,12 +29,34 @@ export default function TargetingModal({ survey, onClose, onUpdate }) {
     maxAge: "",
   });
   const [processingTarget, setProcessingTarget] = useState(false);
+  const [deletingTargets, setDeletingTargets] = useState(false);
+
+  const handleDeleteTargets = async () => {
+    if (
+      !confirm(
+        "Are you sure you want to delete all existing targets for this survey?",
+      )
+    )
+      return;
+    try {
+      setDeletingTargets(true);
+      await campaignClient.deleteTargets(survey.surveyId);
+      toast.success("All targets deleted successfully");
+      onUpdate();
+    } catch (err) {
+      toast.error(
+        "Failed to delete targets: " + (err.message || "Unknown error"),
+      );
+    } finally {
+      setDeletingTargets(false);
+    }
+  };
 
   const handleSaveAccessType = async () => {
     try {
       setSavingAccessType(true);
-      await surveyClient.updateSurvey(survey.surveyId, { accessType });
-      toast.success("Access type updated");
+      await campaignClient.makeGeneralAccess(survey.surveyId);
+      toast.success("Access type updated to general and targets generated");
       onUpdate();
     } catch (err) {
       toast.error(
@@ -53,7 +75,7 @@ export default function TargetingModal({ survey, onClose, onUpdate }) {
     try {
       setProcessingTarget(true);
       const res = await campaignClient.uploadExcel(survey.surveyId, file);
-      toast.success(`Uploaded ${res.data.count} targets successfully`);
+      toast.success(`Uploaded ${res.data.data.count} targets successfully`);
       setAccessType("targeted");
       onUpdate();
       onClose(); // Close modal on success
@@ -90,7 +112,7 @@ export default function TargetingModal({ survey, onClose, onUpdate }) {
         survey.surveyId,
         activeFilters,
       );
-      toast.success(`Generated ${res.data.count} targets successfully`);
+      toast.success(`Generated ${res.data.data.count} targets successfully`);
       setAccessType("targeted");
       onUpdate();
       onClose(); // Close modal on success
@@ -128,110 +150,160 @@ export default function TargetingModal({ survey, onClose, onUpdate }) {
 
         <div className="p-5 overflow-y-auto flex-1 bg-bg">
           <div className="flex flex-col gap-5">
-            <div className="flex flex-col gap-3 pb-5 border-b border-border">
-              <p className="text-sm font-semibold text-text-primary">
-                Survey Access Type
-              </p>
-              <div className="flex items-center gap-4">
-                <div className="relative w-full max-w-[250px]">
-                  <button
-                    onClick={() =>
-                      setIsAccessDropdownOpen(!isAccessDropdownOpen)
-                    }
-                    className="flex items-center justify-between w-full text-sm rounded-md border border-border bg-white px-3 py-2 outline-none hover:border-black transition-colors"
-                  >
-                    {accessType === "general"
-                      ? "General (Open to all)"
-                      : "Targeted (Only chosen users)"}
-                    <ChevronDown
-                      size={16}
-                      className={`transition-transform text-text-muted ${isAccessDropdownOpen ? "rotate-180" : ""}`}
-                    />
-                  </button>
-                  {isAccessDropdownOpen && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-border rounded-md shadow-lg z-10 overflow-hidden">
-                      <button
-                        className={`w-full text-left px-3 py-2 text-sm hover:bg-surface transition-colors ${accessType === "general" ? "bg-surface font-medium" : ""}`}
-                        onClick={() => {
-                          setAccessType("general");
-                          setIsAccessDropdownOpen(false);
-                        }}
-                      >
-                        General (Open to all)
-                      </button>
-                      <button
-                        className={`w-full text-left px-3 py-2 text-sm hover:bg-surface transition-colors border-t border-border ${accessType === "targeted" ? "bg-surface font-medium" : ""}`}
-                        onClick={() => {
-                          setAccessType("targeted");
-                          setIsAccessDropdownOpen(false);
-                        }}
-                      >
-                        Targeted (Only chosen users)
-                      </button>
-                    </div>
-                  )}
-                </div>
-                {survey.accessType === "targeted" &&
-                  accessType === "general" && (
+            {survey.status !== "active" && (
+              <div className="flex flex-col gap-3 pb-5 border-b border-border">
+                <p className="text-sm font-semibold text-text-primary">
+                  Survey Access Type
+                </p>
+                <div className="flex items-center gap-4">
+                  <div className="relative w-full max-w-[250px]">
                     <button
-                      onClick={handleSaveAccessType}
-                      disabled={savingAccessType}
-                      className="px-4 py-2 bg-black text-white text-sm font-medium rounded-md hover:bg-neutral-800 disabled:opacity-50 transition-colors"
+                      onClick={() =>
+                        setIsAccessDropdownOpen(!isAccessDropdownOpen)
+                      }
+                      className="flex items-center justify-between w-full text-sm rounded-md border border-border bg-white px-3 py-2 outline-none hover:border-black transition-colors"
                     >
-                      {savingAccessType ? "Saving..." : "Save"}
+                      {accessType === "general"
+                        ? "General (Open to all)"
+                        : accessType === "targeted"
+                          ? "Targeted (Only chosen users)"
+                          : "Select Access Type"}
+                      <ChevronDown
+                        size={16}
+                        className={`transition-transform text-text-muted ${isAccessDropdownOpen ? "rotate-180" : ""}`}
+                      />
                     </button>
-                  )}
-              </div>
-            </div>
-
-            {accessType === "targeted" ? (
-              <>
-                <div className="flex p-1 bg-surface border border-border rounded-md">
-                  <button
-                    className={`flex-1 py-1.5 text-xs font-medium rounded-sm transition-colors ${targetMode === "upload" ? "bg-white shadow-sm text-black border border-border/50" : "text-text-muted hover:text-text-primary"}`}
-                    onClick={() => setTargetMode("upload")}
-                  >
-                    Upload Excel
-                  </button>
-                  <button
-                    className={`flex-1 py-1.5 text-xs font-medium rounded-sm transition-colors ${targetMode === "generate" ? "bg-white shadow-sm text-black border border-border/50" : "text-text-muted hover:text-text-primary"}`}
-                    onClick={() => setTargetMode("generate")}
-                  >
-                    Generate from Demographics
-                  </button>
-                </div>
-
-                {targetMode === "upload" ? (
-                  <div className="flex flex-col gap-4">
-                    <div className="p-6 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center text-center bg-surface/50">
-                      <FileSpreadsheet
-                        size={32}
-                        className="text-text-muted mb-3"
-                      />
-                      <p className="text-sm font-medium text-text-primary mb-1">
-                        Upload Campaign Target List
-                      </p>
-                      <p className="text-xs text-text-muted max-w-[250px] mb-4">
-                        Excel file must contain `aadhaarNo` and `phone` columns
-                        in the first sheet.
-                      </p>
-                      <input
-                        type="file"
-                        accept=".xlsx,.xls"
-                        onChange={(e) => setFile(e.target.files[0])}
-                        className="block w-full max-w-xs text-xs text-text-muted file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-border/30 file:text-text-primary hover:file:bg-border/50"
-                      />
-                    </div>
-                    <div className="flex justify-end pt-2">
+                    {isAccessDropdownOpen && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-border rounded-md shadow-lg z-10 overflow-hidden">
+                        {survey.status === "approved" && (
+                          <button
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-surface transition-colors ${accessType === "general" ? "bg-surface font-medium" : ""}`}
+                            onClick={() => {
+                              setAccessType("general");
+                              setIsAccessDropdownOpen(false);
+                            }}
+                          >
+                            General (Open to all)
+                          </button>
+                        )}
+                        <button
+                          className={`w-full text-left px-3 py-2 text-sm hover:bg-surface transition-colors border-t border-border ${accessType === "targeted" ? "bg-surface font-medium" : ""}`}
+                          onClick={() => {
+                            setAccessType("targeted");
+                            setIsAccessDropdownOpen(false);
+                          }}
+                        >
+                          Targeted (Only chosen users)
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  {survey.status === "approved" &&
+                    survey.accessType !== accessType &&
+                    accessType === "general" && (
                       <button
-                        onClick={handleUploadTarget}
-                        disabled={processingTarget || !file}
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-black text-white text-sm font-medium rounded-md hover:bg-neutral-800 disabled:opacity-50 transition-colors"
+                        onClick={handleSaveAccessType}
+                        disabled={savingAccessType}
+                        className="px-4 py-2 bg-black text-white text-sm font-medium rounded-md hover:bg-neutral-800 disabled:opacity-50 transition-colors"
                       >
-                        <Upload size={16} />{" "}
-                        {processingTarget ? "Uploading..." : "Upload Targets"}
+                        {savingAccessType ? "Saving..." : "Save"}
+                      </button>
+                    )}
+                </div>
+              </div>
+            )}
+            {survey.status === "active" || accessType === "targeted" ? (
+              <>
+                {survey.status !== "active" && (
+                  <div className="flex p-1 bg-surface border border-border rounded-md">
+                    <button
+                      className={`flex-1 py-1.5 text-xs font-medium rounded-sm transition-colors ${targetMode === "upload" ? "bg-white shadow-sm text-black border border-border/50" : "text-text-muted hover:text-text-primary"}`}
+                      onClick={() => setTargetMode("upload")}
+                    >
+                      Upload Excel
+                    </button>
+                    {survey.status === "approved" && (
+                      <button
+                        className={`flex-1 py-1.5 text-xs font-medium rounded-sm transition-colors ${targetMode === "generate" ? "bg-white shadow-sm text-black border border-border/50" : "text-text-muted hover:text-text-primary"}`}
+                        onClick={() => setTargetMode("generate")}
+                      >
+                        Generate from Demographics
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {(survey.status === "active" &&
+                  survey.targetSource !== "generated") ||
+                targetMode === "upload" ? (
+                  survey.targetSource === "generated" ? (
+                    <div className="flex flex-col items-center justify-center p-8 mt-4 bg-amber-50 border border-amber-200 rounded-lg text-center">
+                      <p className="text-amber-800 text-sm font-medium">
+                        Please delete all previous targets before uploading new
+                        ones.
+                      </p>
+                      <p className="text-amber-700/80 text-xs mt-1 mb-4">
+                        This operation is restricted based on current targeting
+                        configuration.
+                      </p>
+                      <button
+                        onClick={handleDeleteTargets}
+                        disabled={deletingTargets}
+                        className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 transition-colors shadow-sm disabled:opacity-50"
+                      >
+                        {deletingTargets ? "Deleting..." : "Delete All Targets"}
                       </button>
                     </div>
+                  ) : (
+                    <div className="flex flex-col gap-4">
+                      <div className="p-6 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center text-center bg-surface/50">
+                        <FileSpreadsheet
+                          size={32}
+                          className="text-text-muted mb-3"
+                        />
+                        <p className="text-sm font-medium text-text-primary mb-1">
+                          Upload Campaign Target List
+                        </p>
+                        <p className="text-xs text-text-muted max-w-[250px] mb-4">
+                          Excel file must contain `aadhaarNo` and `phone`
+                          columns in the first sheet.
+                        </p>
+                        <input
+                          type="file"
+                          accept=".xlsx,.xls"
+                          onChange={(e) => setFile(e.target.files[0])}
+                          className="block w-full max-w-xs text-xs text-text-muted file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-border/30 file:text-text-primary hover:file:bg-border/50"
+                        />
+                      </div>
+                      <div className="flex justify-end pt-2">
+                        <button
+                          onClick={handleUploadTarget}
+                          disabled={processingTarget || !file}
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-black text-white text-sm font-medium rounded-md hover:bg-neutral-800 disabled:opacity-50 transition-colors"
+                        >
+                          <Upload size={16} />{" "}
+                          {processingTarget ? "Uploading..." : "Upload Targets"}
+                        </button>
+                      </div>
+                    </div>
+                  )
+                ) : survey.targetSource !== null ? (
+                  <div className="flex flex-col items-center justify-center p-8 mt-4 bg-amber-50 border border-amber-200 rounded-lg text-center">
+                    <p className="text-amber-800 text-sm font-medium">
+                      Please delete all previous targets before generating new
+                      ones.
+                    </p>
+                    <p className="text-amber-700/80 text-xs mt-1 mb-4">
+                      This operation is restricted based on current targeting
+                      configuration.
+                    </p>
+                    <button
+                      onClick={handleDeleteTargets}
+                      disabled={deletingTargets}
+                      className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 transition-colors shadow-sm disabled:opacity-50"
+                    >
+                      {deletingTargets ? "Deleting..." : "Delete All Targets"}
+                    </button>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-4">

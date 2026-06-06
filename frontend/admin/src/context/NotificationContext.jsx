@@ -91,7 +91,7 @@ export const NotificationProvider = ({ children }) => {
 
   const markAsRead = async (notificationId) => {
     try {
-      const uid = user?.userId || user?._id;
+      const uid = user?.userId || user?._id || user?.id;
       // Optimistic update
       setNotifications(prev => prev.map(n => {
         if (n._id === notificationId && !n.readBy.includes(uid)) {

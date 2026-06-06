@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import fs from "fs";
 import { stt, sarvam_voice } from "../models/llms.js";
+import { logger } from "./logger.js";
 
 dotenv.config();
 
@@ -41,8 +42,10 @@ export default async function stt_from_twilio_whisper(url) {
         transcription = await stt(filename);
         if (filename) fs.unlinkSync(filename);
     } catch (error) {
-        console.error("❌ STT Whisper Error:", error.message || error);
-        if (filename) fs.unlinkSync(filename);
+        logger.error("Error in stt_from_twilio_whisper:", error);
+        if (filename && fs.existsSync(filename)) {
+            fs.unlinkSync(filename);
+        }
     }
     // console.log("transcription", transcription);
     return transcription;
@@ -66,10 +69,12 @@ export async function stt_from_twilio_sarvam(url) {
         });
         if (filename) fs.unlinkSync(filename);
     } catch (error) {
-        console.error("❌ Sarvam STT Error:", error.message || error);
-        if (filename) fs.unlinkSync(filename);
+        logger.error("Error in stt_from_twilio_sarvam:", error);
+        if (filename && fs.existsSync(filename)) {
+            fs.unlinkSync(filename);
+        }
     }
-    console.log("transcription", transcription);
+    logger.info("transcription: " + JSON.stringify(transcription));
     return transcription;
 }
 

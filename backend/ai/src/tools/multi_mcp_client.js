@@ -1,5 +1,6 @@
 import { MultiServerMCPClient } from "@langchain/mcp-adapters";
-import "dotenv/config"
+import "dotenv/config";
+import { logger } from "../utils/logger.js";
 const mcp_client = new MultiServerMCPClient({
     // search:{
     //     transport:"http",
@@ -14,4 +15,11 @@ const mcp_client = new MultiServerMCPClient({
     }
 })
 
-export const mcp_tools = await mcp_client.getTools();
+let tools = [];
+try {
+    tools = await mcp_client.getTools();
+} catch (e) {
+    logger.error("Failed to initialize mcp tools:", e);
+}
+
+export const mcp_tools = tools;
