@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Volume2, Loader2 } from "lucide-react";
+import { Volume2, Loader2, Bot } from "lucide-react";
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import DynamicField from "../components/survey/DynamicField";
 import { shouldShowField } from "../utils/ConditionEvaluator";
@@ -8,7 +8,7 @@ import { BASE_URL, START_TIME } from "../constants";
 import { speak } from "../utils/textToSpeech";
 import { getOS } from "../utils/getOS";
 import AuthModal from "../components/survey/AuthModal";
-
+import AvatarSurveyMode from "../components/avatar/AvatarSurveyMode";
 export default function SurveyPage() {
     const navigate = useNavigate();
     const { surveyId } = useParams();
@@ -40,6 +40,8 @@ export default function SurveyPage() {
     const [surveyName, setSurveyName] = useState("");
     const [surveyDescription, setSurveyDescription] = useState("");
     const [hasAcceptedDescription, setHasAcceptedDescription] = useState(false);
+    
+    const [isAvatarMode, setIsAvatarMode] = useState(false);
 
     const handleVerified = (data) => {
         setAuth(data);
@@ -122,7 +124,6 @@ export default function SurveyPage() {
 
             const url = `/speech/audio/${surveyId}/${audioId}`;
             const audio = new Audio(url);
-            audio.crossOrigin = "anonymous";
             audioRef.current = audio;
 
             audio.onended = () => {
@@ -196,7 +197,7 @@ export default function SurveyPage() {
                 os: getOS()
             },
             interviewInfo: {
-                interviewMode: "browser",
+                interviewMode: isAvatarMode ? "avatar" : "browser",
                 interviewStartTime: localStorage.getItem(START_TIME),
             },
         }
@@ -205,11 +206,38 @@ export default function SurveyPage() {
         setSubmitLoading(true);
 
         try {
-            const res = await fetch(`${BASE_URL}/response/${surveyId}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ response, paraInfo }),
-            });
+            const hasAudio = response.some(r => r.answer?.isAudioBlob);
+            let fetchOptions;
+
+            if (hasAudio) {
+                const formData = new FormData();
+                const textResponses = [];
+
+                response.forEach((r) => {
+                    if (r.answer?.isAudioBlob) {
+                        formData.append(`audio_${r.qid}`, r.answer.blob, `response_${r.qid}.webm`);
+                        textResponses.push({ qid: r.qid, answer: "AUDIO_UPLOADED" });
+                    } else {
+                        textResponses.push(r);
+                    }
+                });
+
+                formData.append('response', JSON.stringify(textResponses));
+                formData.append('paraInfo', JSON.stringify(paraInfo));
+
+                fetchOptions = {
+                    method: "POST",
+                    body: formData,
+                };
+            } else {
+                fetchOptions = {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ response, paraInfo }),
+                };
+            }
+
+            const res = await fetch(`${BASE_URL}/response/${surveyId}`, fetchOptions);
 
             if (!res.ok) {
                 const json = await res.json();
@@ -301,6 +329,21 @@ export default function SurveyPage() {
         return <AuthModal onVerified={handleVerified} />;
     }
 
+    if (isAvatarMode) {
+        const allQuestions = questionSections.flatMap(section => section.questions);
+        return (
+            <AvatarSurveyMode
+                questions={allQuestions}
+                answers={answers}
+                setAnswers={setAnswers}
+                language={language}
+                surveyId={surveyId}
+                onComplete={handleSubmit}
+                onExit={() => setIsAvatarMode(false)}
+            />
+        );
+    }
+
     /* ---------- SURVEY UI ---------- */
     return (
         <div className="flex flex-col flex-1 min-w-0 bg-bg min-h-screen">
@@ -309,17 +352,25 @@ export default function SurveyPage() {
                 <div className="max-w-3xl mx-auto px-6 py-4 flex justify-between items-center">
                     <h1 className="text-[16px] font-semibold tracking-[-0.02em] text-text-primary">Survey Form</h1>
 
-                    <select
-                        value={language}
-                        onChange={(e) => setLanguage(e.target.value)}
-                        className="bg-surface border border-border text-text-primary rounded-md px-3 py-1.5 text-sm outline-none focus:border-geist-blue transition-colors"
-                    >
-                        {supportedLanguages.map((l) => (
-                            <option key={l} value={l}>
-                                {l.charAt(0).toUpperCase() + l.slice(1)}
-                            </option>
-                        ))}
-                    </select>
+                    <div className="flex items-center gap-3 sm:gap-4">
+                        <button 
+                            onClick={() => setIsAvatarMode(true)}
+                            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-black text-white text-sm font-medium hover:bg-neutral-800 transition-colors"
+                        >
+                            <Bot size={16} /> <span className="hidden sm:inline">Take with AI Avatar</span><span className="sm:hidden">Avatar</span>
+                        </button>
+                        <select
+                            value={language}
+                            onChange={(e) => setLanguage(e.target.value)}
+                            className="bg-surface border border-border text-text-primary rounded-md px-3 py-1.5 text-sm outline-none focus:border-geist-blue transition-colors"
+                        >
+                            {supportedLanguages.map((l) => (
+                                <option key={l} value={l}>
+                                    {l.charAt(0).toUpperCase() + l.slice(1)}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
             </header>
 

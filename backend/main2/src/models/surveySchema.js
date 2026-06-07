@@ -20,6 +20,7 @@ const CHANNELS = [
 	"ivr",
 	"whatsapp",
 	"telegram",
+	"avatar"
 ];
 
 const ShowIfSchema = new mongoose.Schema(

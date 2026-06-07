@@ -5,6 +5,7 @@ import { SurveyResponse } from "../models/responsesSchema.js";
 import { Survey } from "../models/surveySchema.js";
 import { processResponsePincode } from "../utils/pincodeProcessor.js";
 import { evaluateSingleResponse } from "../utils/virtualEnumerator.js";
+import { processAudioResponses } from "../utils/audioProcessor.js"; // New processor
 
 export const submitSurveyResponse = asyncHandler(async (req, res) => {
     const { survey_id } = req.params;
@@ -22,7 +23,16 @@ export const submitSurveyResponse = asyncHandler(async (req, res) => {
         throw new ApiError(403, "Survey is not accepting responses");
     }
 
-    const { response, paraInfo } = req.body;
+    let { response, paraInfo } = req.body;
+    
+    // Parse JSON if received via FormData
+    if (typeof response === "string") {
+        try { response = JSON.parse(response); } catch(e) {}
+    }
+    if (typeof paraInfo === "string") {
+        try { paraInfo = JSON.parse(paraInfo); } catch(e) {}
+    }
+
     if (!paraInfo ||
         !paraInfo.interviewInfo.interviewMode ||
         !paraInfo.interviewInfo.interviewStartTime
@@ -87,6 +97,10 @@ export const submitSurveyResponse = asyncHandler(async (req, res) => {
                     `Valid text answer required for question ${ans.qid}`
                 );
             }
+            // Allow AUDIO_UPLOADED placeholder
+            if (ans.answer === "AUDIO_UPLOADED" || ans.answer === "__AUDIO_BLOB__") {
+                // Valid placeholder for STT processing
+            }
         }
 
         // ---- CHECKBOX ----
@@ -127,6 +141,11 @@ export const submitSurveyResponse = asyncHandler(async (req, res) => {
     // Asynchronous background processing (fire-and-forget)
     (async () => {
         try {
+            // Process STT for audio files first
+            if (req.files && req.files.length > 0) {
+                await processAudioResponses(surveyResponse._id, req.files);
+            }
+            
             await processResponsePincode(surveyResponse._id);
             await evaluateSingleResponse(surveyResponse._id);
         } catch (err) {
