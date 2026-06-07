@@ -1,10 +1,7 @@
 import fs from 'fs';
 import { SurveyResponse } from '../models/responsesSchema.js';
-import { SarvamAIClient } from 'sarvamai';
 
-const sarvam_voice = new SarvamAIClient({
-  apiSubscriptionKey: process.env.SARVAM_API_KEY
-});
+const AI_SERVICE_URL = process.env.AI_SERVER_URL || 'http://localhost:3001';
 
 export async function processAudioResponses(surveyResponseId, files) {
     try {
@@ -26,14 +23,23 @@ export async function processAudioResponses(surveyResponseId, files) {
             
             const qid = match[1];
             
-            // Perform STT using Sarvam SDK
+            // Forward to AI Microservice
             try {
-                const transcription = await sarvam_voice.speechToText.transcribe({
-                    file: fs.createReadStream(file.path),
-                    model: "saaras:v3",
-                    mode: "transcribe"
+                const formData = new FormData();
+                const buffer = fs.readFileSync(file.path);
+                const blob = new Blob([buffer], { type: file.mimetype });
+                formData.append('file', blob, file.originalname);
+
+                const response = await fetch(`${AI_SERVICE_URL}/speech/stt-avatar-sarvam`, {
+                    method: 'POST',
+                    body: formData
                 });
 
+                if (!response.ok) {
+                    throw new Error(`AI STT Service failed with status: ${response.status}`);
+                }
+
+                const transcription = await response.json();
                 const transcribedText = transcription.transcript || transcription.text || "Transcription failed";
 
                 // Update the specific answer in the surveyResponse

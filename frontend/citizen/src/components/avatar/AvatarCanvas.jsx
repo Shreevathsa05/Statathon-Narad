@@ -1,25 +1,34 @@
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, Suspense } from 'react';
 import { Canvas, useGraph, useFrame } from '@react-three/fiber';
-import { useGLTF, Environment, ContactShadows, OrbitControls } from '@react-three/drei';
+import { useGLTF, Environment, ContactShadows, OrbitControls, Html } from '@react-three/drei';
+import { Loader2 } from 'lucide-react';
 import { SkeletonUtils } from 'three-stdlib';
 import * as THREE from 'three';
 
 export default function AvatarCanvas({ isTalking = false, audioIntensity = 0 }) {
   return (
     <div className="w-full h-full relative bg-surface">
-      <Canvas camera={{ position: [0, 1.45, 1.2], fov: 40 }}>
+      <Canvas camera={{ position: [0, 1.35, 0.90], fov: 35 }}>
         <OrbitControls 
           enableZoom={false} 
-          enablePan={false} 
-          target={[0, 1.35, 0]}
-          minPolarAngle={Math.PI / 2.5} 
-          maxPolarAngle={Math.PI / 2.1} 
+          enablePan={false}
+          enableRotate={false}
+          target={[0, 1.30, 0]}
         />
         <ambientLight intensity={0.5} />
         <directionalLight position={[10, 10, 5]} intensity={1} />
         <Environment preset="city" />
         
-        <Model isTalking={isTalking} audioIntensity={audioIntensity} position={[0, -0.1, 0]} />
+        <Suspense fallback={
+          <Html center>
+            <div className="flex flex-col items-center gap-3 text-geist-blue bg-white/80 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-border">
+              <Loader2 className="w-10 h-10 animate-spin" />
+              <p className="font-semibold whitespace-nowrap">Loading Avatar Engine...</p>
+            </div>
+          </Html>
+        }>
+          <Model isTalking={isTalking} audioIntensity={audioIntensity} position={[0, -0.15, 0]} />
+        </Suspense>
         
         <ContactShadows position={[0, -1.2, 0]} opacity={0.4} scale={5} blur={2} far={4} />
       </Canvas>
@@ -37,12 +46,20 @@ function Model({ isTalking, audioIntensity, ...props }) {
   const headInitialRot = useRef(new THREE.Euler());
   const jawRef = useRef();
   const jawInitialRot = useRef(new THREE.Euler());
+  const tongueRef = useRef();
+  const tongueInitialRot = useRef(new THREE.Euler());
   const leftEyeRef = useRef();
   const rightEyeRef = useRef();
   const leftShoulderRef = useRef();
   const rightShoulderRef = useRef();
   const leftArmRef = useRef();
+  const leftArmInitialRot = useRef(new THREE.Euler());
   const rightArmRef = useRef();
+  const rightArmInitialRot = useRef(new THREE.Euler());
+  const leftForearmRef = useRef();
+  const leftForearmInitialRot = useRef(new THREE.Euler());
+  const rightForearmRef = useRef();
+  const rightForearmInitialRot = useRef(new THREE.Euler());
   
   // Find relevant bones
   useMemo(() => {
@@ -57,11 +74,31 @@ function Model({ isTalking, audioIntensity, ...props }) {
           jawRef.current = child;
           jawInitialRot.current.copy(child.rotation);
         }
+        if (name.includes('tongue01')) {
+          tongueRef.current = child;
+          tongueInitialRot.current.copy(child.rotation);
+        }
         
-        // Eyelid bones usually named eye/lid
-        if (name.includes('eyelid') || name.includes('eye_lid') || name.includes('lid')) {
-          if (name.includes('l_') || name.includes('left')) leftEyeRef.current = child;
-          if (name.includes('r_') || name.includes('right')) rightEyeRef.current = child;
+        // Eyeballs (Model has no eyelids)
+        if (name.includes('eye_r')) rightEyeRef.current = child;
+        if (name.includes('eye_l')) leftEyeRef.current = child;
+
+        // Arm bones
+        if (name === 'cc_base_l_upperarm_050') {
+          leftArmRef.current = child;
+          leftArmInitialRot.current.copy(child.rotation);
+        }
+        if (name === 'cc_base_r_upperarm_078') {
+          rightArmRef.current = child;
+          rightArmInitialRot.current.copy(child.rotation);
+        }
+        if (name === 'cc_base_l_forearm_051') {
+          leftForearmRef.current = child;
+          leftForearmInitialRot.current.copy(child.rotation);
+        }
+        if (name === 'cc_base_r_forearm_079') {
+          rightForearmRef.current = child;
+          rightForearmInitialRot.current.copy(child.rotation);
         }
       }
     });
@@ -88,25 +125,31 @@ function Model({ isTalking, audioIntensity, ...props }) {
       headRef.current.rotation.z = THREE.MathUtils.lerp(headRef.current.rotation.z, headInitialRot.current.z, 0.05);
     }
 
-    // Jaw sync (Mouth mimics audio intensity)
+    // Jaw & Tongue sync (Mouth mimics audio intensity)
     if (jawRef.current) {
-      // We stored the initial rotation to avoid squishing the model.
-      // Usually opening the jaw is rotating around the Z axis.
       const targetJawRotation = isTalking ? jawInitialRot.current.z + (audioIntensity * 0.4) : jawInitialRot.current.z;
       jawRef.current.rotation.z = THREE.MathUtils.lerp(jawRef.current.rotation.z, targetJawRotation, 0.3);
     }
-
-    // Slow Blinking
-    // Blinks every ~4 seconds, lasts ~0.2 seconds
-    const blinkCycle = t % 4;
-    const isBlinking = blinkCycle > 3.8;
-    const blinkRotation = isBlinking ? 0.3 : 0; // Adjust lid rotation
-
-    if (leftEyeRef.current) {
-      leftEyeRef.current.rotation.x = THREE.MathUtils.lerp(leftEyeRef.current.rotation.x, blinkRotation, 0.4);
+    
+    if (tongueRef.current) {
+      const targetTongueRotationZ = isTalking ? tongueInitialRot.current.z + (audioIntensity * 0.2 * Math.sin(t * 15)) : tongueInitialRot.current.z;
+      tongueRef.current.rotation.z = THREE.MathUtils.lerp(tongueRef.current.rotation.z, targetTongueRotationZ, 0.4);
     }
-    if (rightEyeRef.current) {
-      rightEyeRef.current.rotation.x = THREE.MathUtils.lerp(rightEyeRef.current.rotation.x, blinkRotation, 0.4);
+
+    // Drop arms from T-pose to standing pose
+    if (leftArmRef.current) {
+      leftArmRef.current.rotation.z = leftArmInitialRot.current.z - 0.85; // Relax arms further
+      leftArmRef.current.rotation.y = leftArmInitialRot.current.y;
+    }
+    if (rightArmRef.current) {
+      rightArmRef.current.rotation.z = rightArmInitialRot.current.z + 0.85; 
+      rightArmRef.current.rotation.y = rightArmInitialRot.current.y;
+    }
+    if (leftForearmRef.current) {
+      leftForearmRef.current.rotation.x = leftForearmInitialRot.current.x - 0.2; // Relax elbow slightly
+    }
+    if (rightForearmRef.current) {
+      rightForearmRef.current.rotation.x = rightForearmInitialRot.current.x - 0.2; // Relax elbow slightly
     }
   });
 

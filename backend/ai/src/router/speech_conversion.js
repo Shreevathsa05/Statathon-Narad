@@ -6,6 +6,11 @@ import { audio_generation } from "../utils/audio_generation.js";
 import { Survey } from "../mongodb/surveySchema.js";
 import { surveyLogs } from "./question_generation_route.js";
 import { logger } from "../utils/logger.js";
+import multer from "multer";
+import fs from "fs";
+import { sarvam_voice } from "../models/llms.js";
+
+const upload = multer({ dest: "uploads/" });
 
 const speech_conversion_router = Router();
 
@@ -36,6 +41,30 @@ speech_conversion_router.post('/stt-twilio-sarvam', async (req, res) => {
         res.status(500).json({ error: "Transcription failed" });
     }
 })
+
+// STT from raw browser file (Avatar Mode)
+speech_conversion_router.post('/stt-avatar-sarvam', upload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: "No audio file provided" });
+        }
+
+        const transcription = await sarvam_voice.speechToText.transcribe({
+            file: fs.createReadStream(req.file.path),
+            model: "saaras:v3",
+            mode: "transcribe"
+        });
+
+        res.json(transcription);
+    } catch (e) {
+        logger.error("Error in stt-avatar-sarvam:", e);
+        res.status(500).json({ error: "Transcription failed" });
+    } finally {
+        if (req.file && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+    }
+});
 
 // tts
 speech_conversion_router.get('/audio/:surveyId/:audioId', (req, res) => {

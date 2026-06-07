@@ -13,14 +13,14 @@ const STATIC_SCRIPTS = {
         outro: "Thank you for completing the survey. Your responses have been recorded.",
         mcq: "Please select an option from the screen below.",
         checkbox: "Please select one or more options from the screen below, then click submit.",
-        text: "Click on the microphone button to start speaking your answer. Once you are done, click stop."
+        text: "Please speak your answer clearly."
     },
     hindi: {
         greeting: "नमस्ते! मैं आपका वर्चुअल सर्वेक्षक हूँ। आइए सर्वेक्षण शुरू करें।",
         outro: "सर्वेक्षण पूरा करने के लिए धन्यवाद। आपकी प्रतिक्रियाएँ दर्ज कर ली गई हैं।",
         mcq: "कृपया नीचे दी गई स्क्रीन से एक विकल्प चुनें।",
         checkbox: "कृपया नीचे दी गई स्क्रीन से एक या अधिक विकल्प चुनें, फिर सबमिट पर क्लिक करें।",
-        text: "अपना उत्तर बोलने के लिए माइक्रोफ़ोन बटन पर क्लिक करें। जब आप पूरा कर लें, तो स्टॉप पर क्लिक करें।"
+        text: "कृपया अपना उत्तर स्पष्ट रूप से बोलें।"
     }
     // Add other languages as needed.
 };

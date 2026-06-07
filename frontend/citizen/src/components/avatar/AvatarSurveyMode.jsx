@@ -20,6 +20,7 @@ export default function AvatarSurveyMode({ questions, answers, setAnswers, langu
   const [script, setScript] = useState([]);
   const [scriptIndex, setScriptIndex] = useState(-1);
   const [isLoadingScript, setIsLoadingScript] = useState(true);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
   
   // sequenceState is used to control InteractionModal (e.g., 'waiting' for input)
   const [sequenceState, setSequenceState] = useState('init'); 
@@ -77,7 +78,8 @@ export default function AvatarSurveyMode({ questions, answers, setAnswers, langu
       }
 
       try {
-        const url = `/speech/audio/${surveyId}/${audioId}`;
+        // Append v=2 to bypass old cached audio files
+        const url = `/speech/audio/${surveyId}/${audioId}?v=2`;
         const audio = new Audio(url);
         audioRef.current = audio;
 
@@ -188,6 +190,7 @@ export default function AvatarSurveyMode({ questions, answers, setAnswers, langu
         // Wait for user input
         setSequenceState('waiting');
       } else if (node.step === 'outro') {
+        setCurrentQuestion(null);
         setSequenceState('finished');
         setTimeout(() => {
           if (isMounted) onComplete();
@@ -232,10 +235,36 @@ export default function AvatarSurveyMode({ questions, answers, setAnswers, langu
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
+      {/* Exit Confirmation Modal */}
+      {showExitConfirm && (
+        <div className="absolute inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
+          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
+            <div className="p-6">
+              <h3 className="text-xl font-semibold text-text-primary mb-2">Exit Survey?</h3>
+              <p className="text-text-muted">Are you sure you want to exit? Your progress may be lost.</p>
+            </div>
+            <div className="flex border-t border-border">
+              <button 
+                onClick={() => setShowExitConfirm(false)}
+                className="flex-1 py-4 text-text-secondary font-medium hover:bg-surface-alt transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={onExit}
+                className="flex-1 py-4 text-geist-error font-medium border-l border-border hover:bg-red-50 transition-colors"
+              >
+                Exit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Half - Avatar */}
       <div className="relative w-full h-[50vh] flex-shrink-0">
         <button 
-          onClick={onExit}
+          onClick={() => setShowExitConfirm(true)}
           className="absolute top-6 right-6 z-20 w-10 h-10 rounded-full bg-black/20 hover:bg-black/40 backdrop-blur-md text-white flex items-center justify-center transition-colors"
         >
           <X size={20} />
@@ -251,6 +280,7 @@ export default function AvatarSurveyMode({ questions, answers, setAnswers, langu
           onAnswer={handleAnswer}
           onAudioRecorded={handleAudioRecorded}
           isListening={sequenceState !== 'waiting' && sequenceState !== 'finished'}
+          currentStep={script[scriptIndex]?.step}
         />
       </div>
     </div>
