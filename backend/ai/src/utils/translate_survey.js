@@ -25,9 +25,7 @@ export default async function translate_survey(surveyId, languages) {
         for (const section of survey.questionSections) {
             pushLog(surveyId, `Translating section: ${section.sectionName}`);
 
-            let translatedQuestions = [];
-
-            for (const question of section.questions) {
+            const questionPromises = section.questions.map(async (question) => {
                 let translationResult = null;
                 let attempts = 0;
                 const maxAttempts = 3;
@@ -102,8 +100,10 @@ export default async function translate_survey(surveyId, languages) {
                 });
                 qObj.audio = audio;
 
-                translatedQuestions.push(qObj);
-            }
+                return qObj;
+            });
+
+            const translatedQuestions = await Promise.all(questionPromises);
 
             updatedSections.push({
                 sectionName: section.sectionName,
