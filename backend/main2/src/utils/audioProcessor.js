@@ -10,6 +10,9 @@ export async function processAudioResponses(surveyResponseId, files) {
         
         if (!surveyResponse) {
             console.error(`[AudioProcessor] SurveyResponse not found: ${surveyResponseId}`);
+            for (const file of files) {
+                if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+            }
             return;
         }
 
@@ -19,7 +22,10 @@ export async function processAudioResponses(surveyResponseId, files) {
         for (const file of files) {
             // Expected fieldname from frontend: "audio_{qid}"
             const match = file.fieldname.match(/^audio_(.+)$/);
-            if (!match) continue;
+            if (!match) {
+                if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+                continue;
+            }
             
             const qid = match[1];
             
