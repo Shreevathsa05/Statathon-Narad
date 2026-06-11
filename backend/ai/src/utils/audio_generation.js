@@ -41,12 +41,9 @@ export async function audio_generation(surveyId) {
     for (const section of survey.questionSections) {
         logger.info(`\n> Processing Section: ${section.sectionName}`);
 
-        for (const question of section.questions) {
-            for (const language of supported_languages) {
-                // temporary
-                if (language === 'malayalam') {
-                    continue;
-                }
+        const questionPromises = section.questions.map(async (question) => {
+            const languagePromises = supported_languages.map(async (language) => {
+
 
                 if (!question.audio) question.audio = new Map();
                 if (!question.audioParts) question.audioParts = new Map();
@@ -54,6 +51,7 @@ export async function audio_generation(surveyId) {
                 const currentParts = question.audioParts.get(language);
                 
                 let isMainAudioDone = (currentAudio && currentAudio.trim() !== "") || (currentParts && currentParts.length > 0);
+
 
                 let scriptText = question.text.get(language) || "";
                 const matches = [...scriptText.matchAll(/\{\{(.*?)\}\}/g)];
@@ -151,19 +149,21 @@ export async function audio_generation(surveyId) {
                         }
                     }
                 }
-            }
-        }
+            });
+            await Promise.all(languagePromises);
+        });
+        await Promise.all(questionPromises);
     }
 
     if (updatesMade) {
         logger.info("\nSaving survey updates to MongoDB...");
         await Survey.updateOne(
             { surveyId: surveyId },
-            { 
-                $set: { 
+            {
+                $set: {
                     questionSections: survey.questionSections,
-                    status: "pending" 
-                } 
+                    status: "pending"
+                }
             }
         );
         log("Audio Generation Agent Completed.");
