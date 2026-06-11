@@ -112,8 +112,20 @@ speech_conversion_router.get('/avatar/script/:surveyId/:language', async (req, r
             for (const question of section.questions) {
                 // Determine if there is pre-generated audio for this question
                 let qAudioId = null;
+                let qAudioParts = null;
                 if (question.audio && question.audio.get(language)) {
                     qAudioId = question.audio.get(language);
+                }
+                if (question.audioParts && question.audioParts.get(language)) {
+                    qAudioParts = question.audioParts.get(language);
+                }
+                
+                let optionsData = null;
+                if (question.options && question.options.length > 0) {
+                    optionsData = question.options.map(opt => ({
+                        id: opt.id,
+                        audioId: opt.audio ? opt.audio.get(language) : null
+                    }));
                 }
 
                 // Add Question Audio Node
@@ -122,6 +134,8 @@ speech_conversion_router.get('/avatar/script/:surveyId/:language', async (req, r
                     qid: question.qid,
                     questionType: question.type,
                     audioId: qAudioId,
+                    audioParts: qAudioParts,
+                    options: optionsData,
                     fallbackText: question.text.get(language) || question.text.get("english")
                 });
 

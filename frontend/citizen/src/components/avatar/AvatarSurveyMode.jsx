@@ -16,7 +16,7 @@ const SYSTEM_SCRIPTS = {
   outro: "Thank you for completing the survey. Your responses have been recorded."
 };
 
-export default function AvatarSurveyMode({ questions, answers, setAnswers, language, surveyId, onComplete, onExit }) {
+export default function AvatarSurveyMode({ questions, answers, setAnswers, setParadata, language, surveyId, onComplete, onExit }) {
   const [script, setScript] = useState([]);
   const [scriptIndex, setScriptIndex] = useState(-1);
   const [isLoadingScript, setIsLoadingScript] = useState(true);
@@ -32,6 +32,30 @@ export default function AvatarSurveyMode({ questions, answers, setAnswers, langu
   const analyserRef = useRef(null);
   const sourceNodeRef = useRef(null);
   const reqAnimRef = useRef(null);
+  const questionStartTimeRef = useRef(null);
+  
+  // Track expected script index to safely abort async loops
+  const expectedScriptIndexRef = useRef(scriptIndex);
+  expectedScriptIndexRef.current = scriptIndex;
+
+  const resolveText = (text) => {
+    if (!text) return "";
+    return text.replace(/\{\{(.*?)\}\}/g, (match, qid) => {
+      const ans = answers[qid];
+      if (!ans) return match;
+      
+      const refQ = questions.find(q => q.qid === qid);
+      if (refQ && (refQ.type === 'mcq' || refQ.type === 'checkbox')) {
+        const ansArray = Array.isArray(ans) ? ans : [ans];
+        const labels = ansArray.map(a => {
+          const opt = refQ.options?.find(o => o.id === a);
+          return opt?.label?.[language] || opt?.label?.english || a;
+        });
+        return labels.join(", ");
+      }
+      return String(ans);
+    });
+  };
 
   // Fetch Dynamic Script
   useEffect(() => {
@@ -167,7 +191,14 @@ export default function AvatarSurveyMode({ questions, answers, setAnswers, langu
           return;
         }
         
-        setCurrentQuestion(targetQ);
+        const resolvedTargetQ = {
+          ...targetQ,
+          text: {
+            ...targetQ.text,
+            [language]: resolveText(targetQ.text?.[language])
+          }
+        };
+        setCurrentQuestion(resolvedTargetQ);
       }
 
       setIsTalking(true);
@@ -176,10 +207,42 @@ export default function AvatarSurveyMode({ questions, answers, setAnswers, langu
       if (node.step === 'greeting' || node.step === 'outro' || node.step === 'instruction') {
         await playAudio(node.audioId, node.fallbackText);
       } else if (node.step === 'question') {
-        await playAudio(node.audioId, node.fallbackText);
+        // 1. Play the main question text
+        if (node.audioParts && node.audioParts.length > 0) {
+            for (const part of node.audioParts) {
+                if (!isMounted || expectedScriptIndexRef.current !== scriptIndex) break;
+                if (part.type === 'text') {
+                    await playAudio(part.audioId);
+                } else if (part.type === 'variable') {
+                    const ans = answers[part.refQid];
+                    if (ans) {
+                        const refQ = questions.find(q => q.qid === part.refQid);
+                        if (refQ && (refQ.type === 'mcq' || refQ.type === 'checkbox')) {
+                            const ansArray = Array.isArray(ans) ? ans : [ans];
+                            for (const a of ansArray) {
+                                if (!isMounted || expectedScriptIndexRef.current !== scriptIndex) break;
+                                const selectedOpt = refQ.options.find(o => o.id === a || (o.label && (o.label[language] === a || o.label.english === a)));
+                                if (selectedOpt && selectedOpt.audio && selectedOpt.audio[language]) {
+                                    await playAudio(selectedOpt.audio[language]);
+                                } else {
+                                    await playAudio(null, a); // Fallback text
+                                }
+                            }
+                        } else {
+                            await playAudio(null, String(ans));
+                        }
+                    } else {
+                        // Missing variable fallback
+                        await playAudio(null, "blank");
+                    }
+                }
+            }
+        } else {
+            await playAudio(node.audioId, node.fallbackText);
+        }
       }
 
-      if (!isMounted) return;
+      if (!isMounted || expectedScriptIndexRef.current !== scriptIndex) return;
       setIsTalking(false);
 
       // Transition logic
@@ -189,6 +252,7 @@ export default function AvatarSurveyMode({ questions, answers, setAnswers, langu
       } else if (node.step === 'instruction') {
         // Wait for user input
         setSequenceState('waiting');
+        questionStartTimeRef.current = Date.now();
       } else if (node.step === 'outro') {
         setCurrentQuestion(null);
         setSequenceState('finished');
@@ -212,6 +276,26 @@ export default function AvatarSurveyMode({ questions, answers, setAnswers, langu
     
     setAnswers(prev => ({ ...prev, [currentQuestion.qid]: answerData }));
     
+    if (questionStartTimeRef.current && setParadata) {
+      const timeTaken = (Date.now() - questionStartTimeRef.current) / 1000;
+      setParadata(prev => {
+        const existing = prev[currentQuestion.qid] || { timeTaken: 0 };
+        return {
+          ...prev,
+          [currentQuestion.qid]: {
+            timeTaken: existing.timeTaken + timeTaken,
+            timestamp: new Date().toISOString()
+          }
+        };
+      });
+    }
+
+    // Move to next node after answering (usually the next question)
+    setScriptIndex(prev => {
+      expectedScriptIndexRef.current = prev + 1;
+      return prev + 1;
+    });
+
     // Stop any ongoing speech if they answered early
     window.speechSynthesis.cancel();
     if (audioRef.current) {
@@ -221,9 +305,6 @@ export default function AvatarSurveyMode({ questions, answers, setAnswers, langu
     if (reqAnimRef.current) cancelAnimationFrame(reqAnimRef.current);
     setIsTalking(false);
     setAudioIntensity(0);
-    
-    // Move to next node after answering (usually the next question)
-    setScriptIndex(prev => prev + 1);
   };
 
   const handleAudioRecorded = (audioBlob) => {

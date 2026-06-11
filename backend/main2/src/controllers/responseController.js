@@ -6,13 +6,15 @@ import { Survey } from "../models/surveySchema.js";
 import { processResponsePincode } from "../utils/pincodeProcessor.js";
 import { evaluateSingleResponse } from "../utils/virtualEnumerator.js";
 import { processAudioResponses } from "../utils/audioProcessor.js"; // New processor
+import fs from "fs";
 
 export const submitSurveyResponse = asyncHandler(async (req, res) => {
-    const { survey_id } = req.params;
+    try {
+        const { survey_id } = req.params;
 
-    if (!survey_id) {
-        throw new ApiError(400, "Survey id is required");
-    }
+        if (!survey_id) {
+            throw new ApiError(400, "Survey id is required");
+        }
 
     const survey = await Survey.findOne({ surveyId: survey_id });
     if (!survey) {
@@ -156,6 +158,14 @@ export const submitSurveyResponse = asyncHandler(async (req, res) => {
     return res.status(201).json(
         new ApiResponse(201, surveyResponse, "Successfully created survey response")
     );
+    } catch (err) {
+        if (req.files) {
+            for (const file of req.files) {
+                if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+            }
+        }
+        throw err;
+    }
 });
 
 export const getAllSurveyResponseBySurveyId = asyncHandler(async (req, res) => {

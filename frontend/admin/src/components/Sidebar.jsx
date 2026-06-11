@@ -17,7 +17,9 @@ import {
   LogOut,
   Sparkles,
   Edit,
-  Loader2
+  Loader2,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext.jsx';
 
@@ -78,6 +80,7 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const toast = useToast();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   if (!user) return null;
 
@@ -96,54 +99,87 @@ export default function Sidebar() {
   };
 
   return (
-    <nav className="w-64 shrink-0 border-r border-border bg-surface-alt flex flex-col sticky top-0 h-screen">
-      <div className="flex items-center gap-3 p-5 border-b border-border">
-        <div className="bg-text-primary text-bg w-6 h-6 flex items-center justify-center rounded font-bold text-sm">N</div>
-        <div>
-          <div className="font-bold text-sm tracking-tight">NARAD</div>
-          <div className="text-[10px] text-text-muted uppercase tracking-wider leading-none mt-[2px]">MoSPI</div>
+    <nav className={`shrink-0 border-r border-border bg-surface-alt flex flex-col sticky top-0 h-screen transition-[width] duration-300 ease-in-out z-50 relative ${isCollapsed ? 'w-[72px]' : 'w-64'}`}>
+      
+      {/* Floating Collapse Toggle */}
+      <button 
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        className="absolute -right-3.5 top-6 z-50 flex items-center justify-center w-7 h-7 bg-white border border-border rounded-full shadow-sm text-text-muted hover:text-text-primary hover:bg-surface transition-colors"
+        title={isCollapsed ? "Expand" : "Collapse"}
+      >
+        {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+      </button>
+
+      {/* Header / Logo Area */}
+      <div className={`flex items-center h-16 px-5 border-b border-border shrink-0 overflow-hidden ${isCollapsed ? 'justify-center px-0' : 'gap-3'}`}>
+        <div className="bg-text-primary text-bg w-8 h-8 flex items-center justify-center rounded font-bold text-sm shrink-0">N</div>
+        
+        <div className={`flex flex-col justify-center transition-opacity duration-300 ${isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100 w-auto'}`}>
+          <div className="font-bold text-[15px] tracking-tight leading-none">NARAD</div>
+          <div className="text-[10px] text-text-muted uppercase tracking-wider mt-[3px]">MoSPI</div>
         </div>
       </div>
 
-      {sections.map(({ section, links }) => (
-        <div key={section} className="flex flex-col gap-1 pt-4 px-2">
-          <div className="text-[11px] uppercase tracking-wider text-text-muted mb-2 px-2">{section}</div>
-          {links.map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === '/admin/users' || to === '/sdrd' || to === '/fod' || to === '/dpd' || to === '/cqcd'}
-              className={({ isActive }) => `relative flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-colors ${isActive ? 'bg-black/5 text-text-primary font-medium before:absolute before:inset-y-1.5 before:left-[-8px] before:w-1 before:bg-black before:rounded-r-full' : 'text-text-secondary hover:bg-black/5 hover:text-text-primary'}`}
-            >
-              <Icon size={16} className="shrink-0 opacity-70" />
-              {label}
-            </NavLink>
-          ))}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide py-3">
+        {sections.map(({ section, links }) => (
+          <div key={section} className="flex flex-col gap-1 px-3 mb-5">
+            {!isCollapsed && <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-1 px-2 overflow-hidden whitespace-nowrap">{section}</div>}
+            {links.map(({ to, label, icon: Icon }) => (
+              <NavLink
+                key={to}
+                to={to}
+                end={to === '/admin/users' || to === '/sdrd' || to === '/fod' || to === '/dpd' || to === '/cqcd'}
+                title={isCollapsed ? label : undefined}
+                className={({ isActive }) => `relative flex items-center rounded-lg transition-all ${isCollapsed ? 'flex-col justify-center h-[64px] px-1 py-2 gap-1 mx-auto w-full' : 'gap-4 px-3 h-10'} ${isActive ? 'bg-black/5 text-text-primary font-medium before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-[3px] before:h-[20px] before:bg-text-primary before:rounded-r-md' : 'text-text-secondary hover:bg-black/5 hover:text-text-primary'}`}
+              >
+                {({ isActive }) => (
+                  <>
+                    <Icon size={isCollapsed ? 22 : 18} className={`shrink-0 transition-all ${isActive ? 'text-text-primary' : 'opacity-70'}`} />
+                    {isCollapsed ? (
+                      <span className="text-[10px] font-medium leading-tight truncate w-full text-center opacity-80">{label.split(' ')[0]}</span>
+                    ) : (
+                      <span className="text-[14px] truncate">{label}</span>
+                    )}
+                  </>
+                )}
+              </NavLink>
+            ))}
         </div>
       ))}
-
-      {/* User Context & Logout */}
-      <div className="mt-auto p-4 border-t border-border">
-        <div className="mb-3">
-          <div className="mb-1">
-            <RoleBadge role={user.role} />
-          </div>
-          <div className="text-text-muted text-xs font-mono overflow-hidden text-ellipsis whitespace-nowrap">
-            {user.email}
-          </div>
         </div>
-        <button 
-          onClick={handleLogout}
-          disabled={isLoggingOut}
-          className="flex items-center justify-start gap-2 px-2 h-9 w-full rounded-md text-sm font-medium text-geist-error/70 bg-transparent hover:bg-geist-error/10 hover:text-geist-error transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isLoggingOut ? (
-            <Loader2 size={16} className="opacity-70 animate-spin" />
-          ) : (
-            <LogOut size={16} className="opacity-70" />
+
+      {/* User Context & Actions */}
+      <div className="mt-auto border-t border-border bg-surface-alt shrink-0">
+        <div className={`p-4 flex flex-col gap-3 transition-all ${isCollapsed ? 'items-center px-2' : ''}`}>
+          {!isCollapsed && (
+            <div className="flex items-center gap-3 overflow-hidden">
+              <div className="shrink-0">
+                <RoleBadge role={user.role} />
+              </div>
+              <div className="text-text-muted text-xs font-mono overflow-hidden text-ellipsis whitespace-nowrap">
+                {user.email}
+              </div>
+            </div>
           )}
-          {isLoggingOut ? 'Logging out...' : 'Log out'}
-        </button>
+          
+          <button 
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            title={isCollapsed ? "Log out" : undefined}
+            className={`flex items-center rounded-lg text-sm font-medium text-geist-error/80 hover:bg-geist-error/10 hover:text-geist-error transition-all disabled:opacity-50 disabled:cursor-not-allowed ${isCollapsed ? 'flex-col justify-center h-[56px] w-full px-1 py-2 gap-1' : 'justify-start gap-3 px-3 h-10 w-full'}`}
+          >
+            {isLoggingOut ? (
+              <Loader2 size={isCollapsed ? 20 : 18} className="opacity-70 animate-spin shrink-0" />
+            ) : (
+              <LogOut size={isCollapsed ? 20 : 18} className="opacity-80 shrink-0" />
+            )}
+            {isCollapsed ? (
+              <span className="text-[10px] font-medium truncate w-full text-center leading-tight">Exit</span>
+            ) : (
+              <span className="truncate">{isLoggingOut ? 'Logging out...' : 'Log out'}</span>
+            )}
+          </button>
+        </div>
       </div>
     </nav>
   );

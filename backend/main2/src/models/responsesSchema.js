@@ -82,6 +82,13 @@ const ResponseSchema = new mongoose.Schema(
 		answer: {
 			type: mongoose.Schema.Types.Mixed,
 		},
+		timeTaken: {
+			type: Number, // In seconds. Represents "active interaction time"
+		},
+		timestamp: {
+			type: Date, // Absolute time the answer was recorded
+			default: Date.now
+		}
 	},
 	{ _id: false },
 );

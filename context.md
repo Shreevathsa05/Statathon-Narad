@@ -43,26 +43,30 @@ On-ground CAPI is preserved because many regions have unstable/no internet, low 
 
 ### High-Level Data Flow
 
-```
-[SDRD / AI] ──► Generate Survey (English) ──► Translate to Regional Languages
-                        │
-                        ▼
-[DPD / main2] ──► Store Survey (status: pending) ──► Approve (status: active)
-                        │
-     ┌──────────────────┼───────────────────────────┐
-     │                  │                           │
-     ▼                  ▼                           ▼
-[Telegram Bot]    [IVR / Exotel]           [WhatsApp / Web]
-delivery_bot      exotel (Twilio)           (Planned)
-     │                  │                           │
-     └──────────────────┴───────────────────────────┘
-                        │
-                        ▼
-           [DPD / main2] ──► POST /api/response/:survey_id
-           Validate + Store Response (with NIC/LGD codes in paraInfo)
-                        │
-                        ▼
-           [CQCD / Admin Panel] ──► View data, export (CSV/XLSX), publish reports
+```mermaid
+graph TD
+    %% Define styles
+    classDef system fill:#e1f5fe,stroke:#0288d1,stroke-width:2px,color:#000
+    classDef process fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000
+    classDef channel fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#000
+
+    SDRD["SDRD / AI"]:::system --> Gen["Generate Survey (English)"]:::process
+    Gen --> Trans["Translate to Regional Languages"]:::process
+    Gen --> DPD1["DPD / main2"]:::system
+    DPD1 --> Store["Store Survey<br/>(status: pending)"]:::process
+    Store --> Approve["Approve Survey<br/>(status: active)"]:::process
+    
+    Approve --> Telegram["Telegram Bot<br/>(delivery_bot)"]:::channel
+    Approve --> IVR["IVR / Exotel<br/>(Twilio)"]:::channel
+    Approve --> Web["WhatsApp / Web<br/>(Planned)"]:::channel
+    
+    Telegram --> DPD2["DPD / main2"]:::system
+    IVR --> DPD2
+    Web --> DPD2
+    
+    DPD2 --> Post["POST /api/response/:survey_id<br/>Validate + Store Response<br/>(with NIC/LGD codes)"]:::process
+    
+    Post --> CQCD["CQCD / Admin Panel<br/>View data, export (CSV/XLSX), publish reports"]:::system
 ```
 
 ---
@@ -93,22 +97,14 @@ pending ──► approved ──► active ──► complete
 
 ## 4. Backend Services Directory
 
-```
+```text
 backend/
-├── ai/               ← SDRD: AI Survey Generation Engine (Port 3001)
-├── main2/            ← DPD: Survey & Response CRUD API (Port 3000)
-├── exotel/           ← FOD: IVR Delivery via Twilio/Exotel (Port 3002)
-├── delivery_bot/     ← FOD: Telegram Survey Delivery Bot (Port 5000)
-└── nginx.conf        ← Reverse proxy routing all services
+├── ai/                     ← SDRD: AI Survey Generation Engine (Port 3001)
+├── main2/                  ← DPD: Survey & Response CRUD API (Port 3000)
+├── exotel/                 ← FOD: IVR Delivery via Twilio/Exotel (Port 3002)
+├── delivery_bot/           ← FOD: Telegram Survey Delivery Bot (Port 5000)
+└── whatsapp_delivery_bot/  ← FOD: WhatsApp Survey Delivery Bot
 ```
-
-All services are containerised and routed by Nginx:
-
-| Nginx Path | Service | Internal Port |
-|---|---|---|
-| `/backend` | `main2` (core API) | `3000` |
-| `/delivery` | `exotel` (IVR) | `4000` |
-| `/bot` | `delivery_bot` (Telegram) | `5000` |
 
 ---
 

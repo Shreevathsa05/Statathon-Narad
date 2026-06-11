@@ -24,9 +24,11 @@ import FieldAgentPage from './pages/field-agent/FieldAgentPage.jsx';
 // Shell Layout
 function AppShell() {
   return (
-    <div className="flex min-h-screen w-full">
+    <div className="flex h-screen w-full overflow-hidden bg-bg">
       <Sidebar />
-      <Outlet />
+      <main className="flex flex-col flex-1 min-w-0 h-full overflow-y-auto relative">
+        <Outlet />
+      </main>
     </div>
   );
 }
