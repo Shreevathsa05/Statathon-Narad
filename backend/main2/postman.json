@@ -1,0 +1,477 @@
+{
+  "info": {
+    "_postman_id": "6f8f0d4a-1d95-4c16-9d9f-4e7c2d5d2b6e",
+    "name": "NARAD Backend API",
+    "description": "Postman collection for the backend API. Auth endpoints set httpOnly cookies, so login/setup-password should be run before protected routes. Use the baseUrl variable to point to your local or deployed server.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "surveyId",
+      "value": "SURV-001"
+    },
+    {
+      "key": "userId",
+      "value": "USER_ID_HERE"
+    },
+    {
+      "key": "notificationId",
+      "value": "NOTIFICATION_ID_HERE"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Check Email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/check-email"
+          }
+        },
+        {
+          "name": "Setup Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"ChangeMe123!\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/setup-password"
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"ChangeMe123!\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Refresh Access Token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/auth/refresh"
+          }
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/auth/me"
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/auth/logout"
+          }
+        },
+        {
+          "name": "Start Survey Auth",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"value\": \"9876543210\",\n  \"mode\": \"phone\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/start/{{surveyId}}"
+          }
+        },
+        {
+          "name": "Complete Survey Auth",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"value\": \"9876543210\",\n  \"mode\": \"phone\",\n  \"otp\": \"123456\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/complete/{{surveyId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Invite User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Field Manager\",\n  \"role\": \"field_manager\",\n  \"region\": \"North\"\n}"
+            },
+            "url": "{{baseUrl}}/api/users/invite"
+          }
+        },
+        {
+          "name": "List Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/users"
+          }
+        },
+        {
+          "name": "Get User By Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/users/{{userId}}"
+          }
+        },
+        {
+          "name": "Suspend User",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": "{{baseUrl}}/api/users/{{userId}}/suspend"
+          }
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/users/{{userId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Surveys",
+      "item": [
+        {
+          "name": "Create Survey",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"surveyId\": \"SURV-001\",\n  \"name\": \"Community Health Survey\",\n  \"status\": \"draft\",\n  \"supportedLanguages\": [\"en\", \"hi\"],\n  \"questionSections\": [\n    {\n      \"sectionId\": \"sec-1\",\n      \"title\": {\n        \"en\": \"General\"\n      },\n      \"questions\": [\n        {\n          \"qid\": \"q1\",\n          \"type\": \"text\",\n          \"text\": {\n            \"en\": \"What is your name?\"\n          }\n        },\n        {\n          \"qid\": \"q2\",\n          \"type\": \"mcq\",\n          \"text\": {\n            \"en\": \"Select one option\"\n          },\n          \"options\": [\n            {\n              \"id\": \"1\",\n              \"label\": {\n                \"en\": \"Option 1\"\n              }\n            },\n            {\n              \"id\": \"2\",\n              \"label\": {\n                \"en\": \"Option 2\"\n              }\n            }\n          ]\n        }\n      ]\n    }\n  ],\n  \"categories\": [\"general\"],\n  \"createdBy\": \"{{userId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/survey"
+          }
+        },
+        {
+          "name": "Get All Surveys",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/survey"
+          }
+        },
+        {
+          "name": "Get Survey By Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/survey/{{surveyId}}"
+          }
+        },
+        {
+          "name": "Update Survey",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"approved\",\n  \"allowedChannels\": [\"avatar\", \"sms\"]\n}"
+            },
+            "url": "{{baseUrl}}/api/survey/{{surveyId}}"
+          }
+        },
+        {
+          "name": "Delete Survey",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/survey/{{surveyId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Responses",
+      "item": [
+        {
+          "name": "Submit Survey Response",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "response",
+                  "type": "text",
+                  "value": "[{\"qid\":\"q1\",\"answer\":\"John Doe\"}]"
+                },
+                {
+                  "key": "paraInfo",
+                  "type": "text",
+                  "value": "{\"interviewInfo\":{\"interviewMode\":\"online\",\"interviewStartTime\":\"2026-06-11T10:00:00.000Z\"}}"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/response/{{surveyId}}"
+          }
+        },
+        {
+          "name": "Get All Responses By Survey",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/response/{{surveyId}}"
+          }
+        },
+        {
+          "name": "Get Flagged Responses By Survey",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/response/{{surveyId}}/flagged"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Demographics",
+      "item": [
+        {
+          "name": "Create Demographic",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"aadhaarNo\": \"123456789012\",\n  \"phone\": \"9876543210\",\n  \"fullName\": \"John Doe\",\n  \"age\": 32,\n  \"gender\": \"male\",\n  \"primaryLanguage\": \"hindi\",\n  \"pincode\": \"110001\",\n  \"area\": \"north delhi\"\n}"
+            },
+            "url": "{{baseUrl}}/api/demographic"
+          }
+        },
+        {
+          "name": "Lookup Demographic",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/demographic/lookup?uidType=phone&val=9876543210"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Campaign",
+      "item": [
+        {
+          "name": "Upload Campaign Excel",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/campaign/upload/{{surveyId}}"
+          }
+        },
+        {
+          "name": "Generate Campaign Targets",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"filters\": {\n    \"age\": {\"$gte\": 18},\n    \"gender\": \"male\"\n  }\n}"
+            },
+            "url": "{{baseUrl}}/api/campaign/generate/{{surveyId}}"
+          }
+        },
+        {
+          "name": "Make Survey General Access",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/campaign/general/{{surveyId}}"
+          }
+        },
+        {
+          "name": "Get Campaign Targets",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/campaign/targets/{{surveyId}}"
+          }
+        },
+        {
+          "name": "Delete Campaign Targets",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/campaign/targets/{{surveyId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Stream Notifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/notifications/stream"
+          }
+        },
+        {
+          "name": "Get Notifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/notifications"
+          }
+        },
+        {
+          "name": "Mark Notification As Read",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/notifications/read/{{notificationId}}"
+          }
+        },
+        {
+          "name": "Create Notification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetRoles\": [\"admin\", \"fod\"],\n  \"title\": \"Survey Updated\",\n  \"message\": \"Survey status changed to approved\",\n  \"type\": \"SURVEY_STATUS_UPDATE\",\n  \"metadata\": {\n    \"surveyId\": \"SURV-001\"\n  }\n}"
+            },
+            "url": "{{baseUrl}}/api/notifications"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Avatar",
+      "item": [
+        {
+          "name": "Trigger Avatar Survey",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"USER_ID_HERE\",\n  \"language\": \"en\"\n}"
+            },
+            "url": "{{baseUrl}}/api/avatar/trigger/{{surveyId}}"
+          }
+        }
+      ]
+    }
+  ]
+}
