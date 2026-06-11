@@ -108,7 +108,10 @@ function SurveyCard({ survey, onClick, index = 0 }) {
 
   const questionCount = localSurvey.questionSections?.reduce((acc, section) => acc + (section.questions?.length || 0), 0) || 0;
   const sectionCount = localSurvey.questionSections?.length || 0;
-  const languages = localSurvey.supportedLanguages?.join(', ') || 'English';
+  const supportedLangs = localSurvey.supportedLanguages?.length > 0 ? localSurvey.supportedLanguages : ['English'];
+  const languages = supportedLangs.length > 2 
+    ? `${supportedLangs.slice(0, 2).join(', ')} +${supportedLangs.length - 2}`
+    : supportedLangs.join(', ');
   
   // Clean up repetitive titles from AI generation
   let displayName = localSurvey.name || 'Untitled Survey';

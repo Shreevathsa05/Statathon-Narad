@@ -2,93 +2,176 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { surveyClient } from '../../api/survey';
 import { aiClient } from '../../api/aiClient';
-import { ArrowLeft, Sparkles, CheckCircle2, AlertCircle, Save, X, Loader2, Globe, Check, Edit2, Trash2, Volume2, AudioLines, Bell, GitBranch, Plus, MoreVertical } from 'lucide-react';
+import { ArrowLeft, Sparkles, CheckCircle2, AlertCircle, Save, X, Loader2, Globe, Check, Edit2, Trash2, Volume2, AudioLines, Bell, GitBranch, Plus, MoreVertical, GripVertical } from 'lucide-react';
 import { useToast } from '../../context/ToastContext.jsx';
 import { useNotification } from '../../context/NotificationContext.jsx';
 import NotificationSidebar from '../../components/NotificationSidebar.jsx';
 
-const TypewriterMessage = ({ content, isList = false }) => {
-  const [visibleCount, setVisibleCount] = useState(0);
-  const [visibleListCounts, setVisibleListCounts] = useState([]);
+
+const RichQuestionInput = React.forwardRef(({ value, onChange, previousQuestions, placeholder }, ref) => {
+  const editorRef = React.useRef(null);
+
+  React.useImperativeHandle(ref, () => ({
+    insertVariable
+  }));
+
+  const rawToHtml = (text) => {
+    if (!text) return '';
+    let html = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const matches = [...html.matchAll(/\{\{(.*?)\}\}/g)];
+    for (const match of matches) {
+      const qid = match[1];
+      const targetQ = previousQuestions.find(pq => pq.qid === qid);
+      const label = targetQ?.text?.english || 'Variable';
+      const spanHtml = `&#8203;<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-geist-blue/10 text-geist-blue border border-geist-blue/20 mx-1 align-baseline select-none group" contenteditable="false" data-qid="${qid}">@${label}<span class="ml-1 opacity-0 group-hover:opacity-100 cursor-pointer text-geist-blue/60 hover:text-red-500 transition-colors" data-delete-qid="${qid}">×</span></span>&#8203;`;
+      html = html.replace(match[0], spanHtml);
+    }
+    return html;
+  };
+
+  const htmlToRaw = () => {
+    if (!editorRef.current) return '';
+    let raw = '';
+    const traverse = (node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        raw += node.textContent;
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        if (node.tagName === 'SPAN' && node.dataset.qid) {
+          raw += `{{${node.dataset.qid}}}`;
+        } else {
+          if (node.tagName === 'DIV' || node.tagName === 'BR') {
+            if (raw.length > 0) raw += ' ';
+          }
+          for (const child of node.childNodes) {
+            traverse(child);
+          }
+        }
+      }
+    };
+    for (const child of editorRef.current.childNodes) {
+      traverse(child);
+    }
+    return raw.replace(/\u200B/g, '').trim().replace(/\s+/g, ' ');
+  };
 
   useEffect(() => {
-    let timer;
-    let isMounted = true;
-
-    if (isList && Array.isArray(content)) {
-      const itemsWords = content.map(item => item.split(' '));
-      setVisibleListCounts(new Array(content.length).fill(0));
-      let currentItemIdx = 0;
-      let currentWordIdx = 0;
-
-      const typeNextWord = () => {
-        if (!isMounted) return;
-        if (currentItemIdx < itemsWords.length) {
-          setVisibleListCounts(prev => {
-            const next = [...prev];
-            next[currentItemIdx] = currentWordIdx + 1;
-            return next;
-          });
-          currentWordIdx++;
-          if (currentWordIdx >= itemsWords[currentItemIdx].length) {
-            currentWordIdx = 0;
-            currentItemIdx++;
-          }
-          timer = setTimeout(typeNextWord, 80);
-        }
-      };
-      typeNextWord();
-    } else if (typeof content === 'string') {
-      const words = content.split(' ');
-      let currentCount = 0;
-      setVisibleCount(0);
-      const typeNextWord = () => {
-        if (!isMounted) return;
-        if (currentCount < words.length) {
-          currentCount++;
-          setVisibleCount(currentCount);
-          timer = setTimeout(typeNextWord, 80);
-        }
-      };
-      typeNextWord();
+    if (editorRef.current && editorRef.current.innerHTML === '') {
+      editorRef.current.innerHTML = rawToHtml(value);
     }
-    
-    return () => {
-      isMounted = false;
-      clearTimeout(timer);
+
+    const handleEditorClick = (e) => {
+      const deleteBtn = e.target.closest('[data-delete-qid]');
+      if (deleteBtn) {
+        const badgeSpan = deleteBtn.closest('span[data-qid]');
+        if (badgeSpan) {
+          // Remove the leading and trailing zero-width spaces if possible
+          if (badgeSpan.previousSibling && badgeSpan.previousSibling.nodeType === Node.TEXT_NODE && badgeSpan.previousSibling.textContent.endsWith('\u200B')) {
+            badgeSpan.previousSibling.textContent = badgeSpan.previousSibling.textContent.slice(0, -1);
+          }
+          if (badgeSpan.nextSibling && badgeSpan.nextSibling.nodeType === Node.TEXT_NODE && badgeSpan.nextSibling.textContent.startsWith('\u200B')) {
+            badgeSpan.nextSibling.textContent = badgeSpan.nextSibling.textContent.substring(1);
+          }
+          badgeSpan.remove();
+          handleInput();
+        }
+      }
     };
-  }, [content, isList]);
 
-  if (isList) {
-    return (
-      <ul className="list-disc pl-4 m-0 space-y-1 text-text-secondary">
-        {content.map((item, i) => {
-          const words = item.split(' ');
-          const count = visibleListCounts[i] || 0;
-          if (count === 0) return null;
-          return (
-            <li key={i}>
-              {words.slice(0, count).map((word, wIdx) => (
-                <span key={wIdx} className="inline-block animate-word">{word}&nbsp;</span>
-              ))}
-            </li>
-          );
-        })}
-      </ul>
-    );
-  }
+    if (editorRef.current) {
+      editorRef.current.addEventListener('click', handleEditorClick);
+    }
+    return () => {
+      if (editorRef.current) {
+        editorRef.current.removeEventListener('click', handleEditorClick);
+      }
+    };
+  }, []);
 
-  const words = typeof content === 'string' ? content.split(' ') : [];
+  const handleInput = () => {
+    onChange(htmlToRaw());
+  };
+
+  const insertVariable = (qid) => {
+    if (!editorRef.current) return;
+    editorRef.current.focus();
+    
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+    const range = selection.getRangeAt(0);
+    
+    if (!editorRef.current.contains(range.commonAncestorContainer)) {
+      range.selectNodeContents(editorRef.current);
+      range.collapse(false);
+    }
+
+    const targetQ = previousQuestions.find(pq => pq.qid === qid);
+    const label = targetQ?.text?.english || 'Variable';
+    
+    const span = document.createElement('span');
+    span.className = 'inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-geist-blue/10 text-geist-blue border border-geist-blue/20 mx-1 align-baseline select-none group';
+    span.contentEditable = 'false';
+    span.dataset.qid = qid;
+    span.innerHTML = `@${label}<span class="ml-1 opacity-0 group-hover:opacity-100 cursor-pointer text-geist-blue/60 hover:text-red-500 transition-colors" data-delete-qid="${qid}">×</span>`;
+    
+    const zws1 = document.createTextNode('\u200B'); // zero width space
+    const space = document.createTextNode(' '); // normal space
+    const zws2 = document.createTextNode('\u200B');
+    
+    // Insert: ZWS -> Badge -> ZWS -> Space
+    range.insertNode(space);
+    range.insertNode(zws2);
+    range.insertNode(span);
+    range.insertNode(zws1);
+    
+    // Move cursor exactly after the second ZWS, before the real space
+    range.setStartAfter(zws2);
+    range.setEndAfter(zws2);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    
+    handleInput();
+  };
+
   return (
-    <span>
-      {words.slice(0, visibleCount).map((word, i) => (
-        <span key={i} className="inline-block animate-word">{word}&nbsp;</span>
-      ))}
-    </span>
+    <div className="relative flex-1 flex items-start group">
+      <div 
+        ref={editorRef}
+        contentEditable
+        onInput={handleInput}
+        onBlur={handleInput}
+        className="flex-1 min-h-[32px] bg-transparent border border-dashed border-gray-300 focus:border-geist-blue hover:border-gray-400 text-text-primary text-base font-medium p-1 outline-none transition-colors rounded-sm empty:before:content-[attr(data-placeholder)] empty:before:text-text-muted"
+        data-placeholder={placeholder}
+      />
+    </div>
   );
-};
+});
 
 export default function SurveyEditor({ surveyId: propSurveyId }) {
+  const renderTemplatedText = (text, allPreviousQuestions, onRemoveVariable) => {
+    if (!text) return null;
+    const parts = text.split(/(\{\{.*?\}\})/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('{{') && part.endsWith('}}')) {
+        const qid = part.slice(2, -2);
+        const refQ = allPreviousQuestions.find(q => q.qid === qid);
+        const label = refQ ? (refQ.text?.english || qid).substring(0, 20) + (refQ.text?.english?.length > 20 ? '...' : '') : qid;
+        return (
+          <span key={i} className="inline-flex items-center px-1.5 py-0.5 mx-1 text-[11px] font-medium rounded border border-geist-blue/20 bg-geist-blue/10 text-geist-blue select-none group">
+            @{label}
+            {onRemoveVariable && (
+              <button 
+                onClick={() => onRemoveVariable(qid)}
+                className="ml-1 opacity-0 group-hover:opacity-100 hover:text-red-600 transition-opacity"
+              >
+                <X size={10} />
+              </button>
+            )}
+          </span>
+        );
+      }
+      return <span key={i}>{part}</span>;
+    });
+  };
   const { surveyId: paramSurveyId } = useParams();
   const surveyId = propSurveyId || paramSurveyId;
   const navigate = useNavigate();
@@ -102,6 +185,10 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
   const [approving, setApproving] = useState(false);
 
   const [isLogicMode, setIsLogicMode] = useState(false);
+  const [draggedSectionIdx, setDraggedSectionIdx] = useState(null);
+  const [activeDragHandle, setActiveDragHandle] = useState(null);
+  const [dropTargetIdx, setDropTargetIdx] = useState(null);
+  const [reorderConflictModal, setReorderConflictModal] = useState({ show: false, fromIdx: null, toIdx: null, conflicts: [], proposedSections: [] });
   const [showActionMenu, setShowActionMenu] = useState(false);
   const [localTitle, setLocalTitle] = useState('');
   const [localDescription, setLocalDescription] = useState('');
@@ -110,6 +197,8 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
   const [localSections, setLocalSections] = useState([]);
   const [hasChanges, setHasChanges] = useState(false);
   const [editingSections, setEditingSections] = useState({}); // Track edit mode per section
+  const [highlightLogic, setHighlightLogic] = useState({ qid: null, equals: null });
+  const questionInputRefs = React.useRef({});
 
   // AI Improve state
   const [activeImproveSection, setActiveImproveSection] = useState(null); // name of section
@@ -129,7 +218,7 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
   const activeQuestionRef = React.useRef(null);
 
   // Multi-lang state
-  const [showLangPanel, setShowLangPanel] = useState(false);
+  const [showTranslateModal, setShowTranslateModal] = useState(false);
   const [selectedLangs, setSelectedLangs] = useState([]);
   const [translateStatus, setTranslateStatus] = useState('idle');
   const [translateLogs, setTranslateLogs] = useState([]);
@@ -168,7 +257,7 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
       return;
     }
 
-    const updated = [...localSections];
+    const updated = structuredClone(localSections);
     if (type === 'section') {
       updated.splice(secIdx, 1);
     } else if (type === 'question') {
@@ -229,7 +318,159 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
     }
   };
 
+  const handleDragStart = (e, idx) => {
+    if (idx === 0) return; // Prevent dragging demographics
+    setDraggedSectionIdx(idx);
+    e.dataTransfer.effectAllowed = 'move';
+    
+    // Set a custom drag image (just the header) so we don't drag a massive transparent ghost of the uncollapsed section
+    const headerEl = e.currentTarget.querySelector('.bg-surface');
+    if (headerEl) {
+      e.dataTransfer.setDragImage(headerEl, 20, 20);
+    }
 
+    setTimeout(() => {
+      e.target.classList.add('opacity-40');
+    }, 0);
+  };
+
+  const handleDragEnd = (e) => {
+    setDraggedSectionIdx(null);
+    setDropTargetIdx(null);
+    e.target.classList.remove('opacity-40');
+  };
+
+  const handleDragOver = (e, idx) => {
+    e.preventDefault();
+    if (idx === 0) return;
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDragEnter = (e, idx) => {
+    if (idx === 0) return;
+    setDropTargetIdx(idx);
+  };
+
+  const checkReorderConflicts = (fromIdx, toIdx) => {
+    const conflicts = [];
+    if (fromIdx === toIdx) return { conflicts, simulated: localSections };
+    
+    const simulated = structuredClone(localSections);
+    const [movedSection] = simulated.splice(fromIdx, 1);
+    simulated.splice(toIdx, 0, movedSection);
+
+    const qidToNewSecIdx = {};
+    simulated.forEach((sec, sIdx) => {
+      sec.questions.forEach(q => {
+        qidToNewSecIdx[q.qid] = sIdx;
+      });
+    });
+
+    simulated.forEach((sec, sIdx) => {
+      if (sec.showIf?.questionId) {
+        const refIdx = qidToNewSecIdx[sec.showIf.questionId];
+        if (refIdx !== undefined && refIdx >= sIdx) {
+          conflicts.push(`Section "${sec.sectionName}" relies on a question that now appears after it.`);
+        }
+      }
+
+      sec.questions.forEach((q, qIdx) => {
+        if (q.showIf?.questionId) {
+          const refIdx = qidToNewSecIdx[q.showIf.questionId];
+          if (refIdx !== undefined && refIdx >= sIdx) {
+            conflicts.push(`Question "Q${qIdx + 1}" in "${sec.sectionName}" relies on a question that now appears after it.`);
+          }
+        }
+        
+        const text = q.text?.english || "";
+        const matches = [...text.matchAll(/\{\{(.*?)\}\}/g)];
+        matches.forEach(match => {
+          const varQid = match[1];
+          const refIdx = qidToNewSecIdx[varQid];
+          if (refIdx !== undefined && refIdx >= sIdx) {
+            conflicts.push(`Question "Q${qIdx + 1}" in "${sec.sectionName}" uses a variable {{${varQid}}} from a question that now appears after it.`);
+          }
+        });
+      });
+    });
+
+    return { conflicts, simulated };
+  };
+
+  const handleDrop = (e, toIdx) => {
+    e.preventDefault();
+    if (draggedSectionIdx === null || draggedSectionIdx === toIdx || toIdx === 0) {
+      setDraggedSectionIdx(null);
+      setDropTargetIdx(null);
+      return;
+    }
+
+    const { conflicts, simulated } = checkReorderConflicts(draggedSectionIdx, toIdx);
+
+    if (conflicts.length > 0) {
+      setReorderConflictModal({
+        show: true,
+        fromIdx: draggedSectionIdx,
+        toIdx,
+        conflicts,
+        proposedSections: simulated
+      });
+    } else {
+      setLocalSections(simulated);
+      setHasChanges(true);
+    }
+
+    setDraggedSectionIdx(null);
+    setDropTargetIdx(null);
+  };
+
+  const handleAcknowledgeReorder = () => {
+    let strippedSections = structuredClone(reorderConflictModal.proposedSections);
+    
+    const qidToNewSecIdx = {};
+    strippedSections.forEach((sec, sIdx) => {
+      sec.questions.forEach(q => {
+        qidToNewSecIdx[q.qid] = sIdx;
+      });
+    });
+
+    strippedSections.forEach((sec, sIdx) => {
+      if (sec.showIf?.questionId) {
+        const refIdx = qidToNewSecIdx[sec.showIf.questionId];
+        if (refIdx !== undefined && refIdx >= sIdx) {
+          delete sec.showIf;
+        }
+      }
+
+      sec.questions.forEach((q) => {
+        if (q.showIf?.questionId) {
+          const refIdx = qidToNewSecIdx[q.showIf.questionId];
+          if (refIdx !== undefined && refIdx >= sIdx) {
+            delete q.showIf;
+          }
+        }
+        
+        if (q.text) {
+          Object.keys(q.text).forEach(lang => {
+            let txt = q.text[lang] || "";
+            const matches = [...txt.matchAll(/\{\{(.*?)\}\}/g)];
+            matches.forEach(match => {
+              const varQid = match[1];
+              const refIdx = qidToNewSecIdx[varQid];
+              if (refIdx !== undefined && refIdx >= sIdx) {
+                txt = txt.replace(new RegExp(`\\{\\{${varQid}\\}\\}`, 'g'), '');
+              }
+            });
+            q.text[lang] = txt.replace(/\s+/g, ' ').trim();
+          });
+        }
+      });
+    });
+
+    setLocalSections(strippedSections);
+    setHasChanges(true);
+    setReorderConflictModal({ show: false, fromIdx: null, toIdx: null, conflicts: [], proposedSections: [] });
+  };
 
   useEffect(() => {
     let interval;
@@ -285,6 +526,15 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
             if (!opt.label?.english || !opt.label.english.trim()) {
               return `Option ${optIdx + 1} of question ${qIdx + 1} in section "${section.sectionName}" is empty.`;
             }
+          }
+        }
+        
+        if (q.showIf) {
+          if (!q.showIf.questionId) {
+            return `Question ${qIdx + 1} in section "${section.sectionName}" has incomplete logic (missing target question). Please complete or remove it.`;
+          }
+          if (!q.showIf.equals || q.showIf.equals.trim() === '') {
+            return `Question ${qIdx + 1} in section "${section.sectionName}" has incomplete logic (missing comparison value). Please complete or remove it.`;
           }
         }
       }
@@ -386,6 +636,11 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
   const playAudio = async (audioId) => {
     if (!audioId) return;
 
+    if (audioId === 'stitched') {
+      toast.info("Dynamic audio with variables can only be played in the live survey.");
+      return;
+    }
+
     if (playingAudioId === audioId && audioObjRef.current) {
       if (!audioObjRef.current.paused) {
         audioObjRef.current.pause();
@@ -466,7 +721,7 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
   };
 
   const updateQuestionText = (sectionIndex, qIndex, newText) => {
-    const updated = [...localSections];
+    const updated = structuredClone(localSections);
     if (!updated[sectionIndex].questions[qIndex].text) {
       updated[sectionIndex].questions[qIndex].text = {};
     }
@@ -476,7 +731,7 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
   };
 
   const updateOptionText = (sectionIndex, qIndex, optIndex, newLabel) => {
-    const updated = [...localSections];
+    const updated = structuredClone(localSections);
     if (!updated[sectionIndex].questions[qIndex].options[optIndex].label) {
       updated[sectionIndex].questions[qIndex].options[optIndex].label = {};
     }
@@ -501,7 +756,7 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
   };
 
   const addQuestion = (secIdx) => {
-    const updated = [...localSections];
+    const updated = structuredClone(localSections);
     const newQid = window.crypto.randomUUID ? window.crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
     updated[secIdx].questions.push({
       qid: newQid,
@@ -524,7 +779,7 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
   };
 
   const changeQuestionType = (secIdx, qIdx, newType) => {
-    const updated = [...localSections];
+    const updated = structuredClone(localSections);
     const q = updated[secIdx].questions[qIdx];
     q.type = newType;
     if ((newType === 'mcq' || newType === 'checkbox') && (!q.options || q.options.length === 0)) {
@@ -538,7 +793,7 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
   };
 
   const addOption = (secIdx, qIdx) => {
-    const updated = [...localSections];
+    const updated = structuredClone(localSections);
     const q = updated[secIdx].questions[qIdx];
     if (!q.options) q.options = [];
     const optId = window.crypto.randomUUID ? window.crypto.randomUUID().slice(0, 8) : Math.random().toString(36).substring(2, 10);
@@ -606,9 +861,11 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
   const isTranslationLocked = translateStatus === 'processing' || audioGenerationStatus === 'processing' || hasTranslations || hasAudioGenerated;
 
   return (
-    <div className="flex flex-col flex-1 min-w-0 bg-bg">
-      {/* Sticky Header for Back Button & Notifications */}
-      <div className="bg-bg border-b border-border">
+    <div className="absolute inset-0 flex flex-col bg-bg">
+      {/* Pinned Header — never scrolls */}
+      <div className="shrink-0 z-[40] flex flex-col w-full shadow-sm bg-bg">
+        {/* Top Navigation Bar (Back Button & Notifications) */}
+        <div className="bg-bg border-b border-border">
         {/* Full-width container */}
         <div className="w-full px-8 py-4 flex items-center justify-between">
           <button 
@@ -633,8 +890,8 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
         </div>
       </div>
         
-      {/* Top Bar with Title and Actions */}
-      <div className="w-full bg-surface border-b border-border pt-6 pb-6 sticky top-0 z-[40]">
+      {/* Title and Actions Bar */}
+      <div className="w-full bg-surface border-b border-border pt-6 pb-6">
         {/* Constrained container for Title and Actions */}
         <div className="w-full max-w-[1200px] mx-auto px-6 flex flex-col lg:flex-row lg:items-start justify-between gap-6">
           <div className="flex-1 min-w-0">
@@ -665,8 +922,8 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
                 {isPending && (
                   <button
                     className="inline-flex items-center justify-center gap-1.5 px-2.5 h-7 text-xs font-medium rounded bg-surface border border-border text-text-muted hover:bg-surface-alt hover:text-text-primary transition-colors shrink-0"
-                    onClick={() => !isLogicMode && setIsEditingTitle(true)}
-                    disabled={isTranslationLocked || saving || approving || isLogicMode}
+                    onClick={() => setIsEditingTitle(true)}
+                    disabled={isTranslationLocked || saving || approving}
                   >
                     <Edit2 size={14} /> Edit Title
                   </button>
@@ -692,28 +949,7 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
                 Save Draft
               </button>
             )}
-            <button 
-              className={`inline-flex items-center justify-center gap-2 px-4 h-9 text-sm font-medium rounded-md border transition-colors disabled:opacity-50 shrink-0 whitespace-nowrap ${
-                isLogicMode 
-                  ? 'bg-geist-blue/10 border-geist-blue/20 text-geist-blue hover:bg-geist-blue/20' 
-                  : 'bg-white border-border text-text-primary hover:bg-surface-alt'
-              }`}
-              onClick={() => {
-                setIsLogicMode(!isLogicMode);
-                if (!isLogicMode) {
-                  setEditingSections({});
-                  setShowDescPanel(false);
-                  setIsEditingTitle(false);
-                  toast.info("Entered Logic Mode. Structural editing is locked.");
-                } else {
-                  toast.success("Exited Logic Mode");
-                }
-              }} 
-              disabled={translateStatus === 'processing' || audioGenerationStatus === 'processing' || hasAudioGenerated} 
-              title={hasAudioGenerated ? "Survey is locked after audio generation" : ""}
-            >
-              <GitBranch size={16} /> {isLogicMode ? 'Exit Logic Mode' : 'Logic Mode'}
-            </button>
+
             <button className="inline-flex items-center justify-center gap-2 px-4 h-9 text-sm font-medium rounded-md bg-black text-white hover:bg-neutral-800 transition-colors disabled:opacity-50 shrink-0 whitespace-nowrap" onClick={() => setShowApproveModal(true)} disabled={approving || translateStatus === 'processing'}>
               {approving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
               Approve
@@ -731,20 +967,6 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowActionMenu(false)} />
                   <div className="absolute right-0 top-[calc(100%+8px)] w-56 bg-white border border-border rounded-md shadow-[0_4px_6px_rgba(0,0,0,0.07),0_2px_4px_rgba(0,0,0,0.06)] py-1 z-50 flex flex-col">
-                    <button 
-                      className="w-full text-left px-4 py-2.5 text-sm text-text-primary hover:bg-black/5 flex items-center gap-2.5 disabled:opacity-50 transition-colors"
-                      onClick={() => { setShowActionMenu(false); setShowAudioModal(true); }}
-                      disabled={audioGenerationStatus === 'processing' || translateStatus === 'processing' || hasAudioGenerated}
-                    >
-                      {audioGenerationStatus === 'processing' ? <Loader2 size={15} className="animate-spin" /> : <AudioLines size={15} />} Generate Audio
-                    </button>
-                    <button 
-                      className="w-full text-left px-4 py-2.5 text-sm text-text-primary hover:bg-black/5 flex items-center gap-2.5 disabled:opacity-50 transition-colors"
-                      onClick={() => { setShowActionMenu(false); setShowLangPanel(!showLangPanel); }}
-                      disabled={translateStatus === 'processing' || audioGenerationStatus === 'processing' || hasAudioGenerated}
-                    >
-                      <Globe size={15} /> Translate Survey
-                    </button>
                     <div className="h-px bg-border my-1 mx-2"></div>
                     <button 
                       className="w-full text-left px-4 py-2.5 text-sm font-medium text-geist-error hover:bg-geist-error/10 flex items-center gap-2.5 disabled:opacity-50 transition-colors"
@@ -760,9 +982,11 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
           </div>
         )}
       </div>
+      </div>
 
-      {/* Main Content */}
-      <div className="flex flex-col flex-1 w-full max-w-[1200px] mx-auto px-6 pb-16 pt-6">
+      {/* Scrollable Content — only this area scrolls */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+      <div className="flex flex-col w-full max-w-[1200px] mx-auto px-6 pb-24 pt-6">
       
       {/* Description Panel */}
       {showDescPanel ? (
@@ -802,7 +1026,7 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
               <button
                 className="inline-flex items-center justify-center gap-1.5 px-3 h-8 text-xs font-medium rounded bg-surface border border-border text-text-muted hover:bg-surface-alt hover:text-text-primary transition-colors shrink-0"
                 onClick={() => setShowDescPanel(true)}
-                disabled={isTranslationLocked || saving || approving || isLogicMode}
+                disabled={isTranslationLocked || saving || approving}
               >
                 <Edit2 size={14} /> {localDescription ? 'Edit Description' : 'Add Description'}
               </button>
@@ -820,51 +1044,6 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
         </div>
       )}
 
-      {/* Language Translation Panel */}
-      {showLangPanel && (
-        <div className="bg-surface-alt border border-border rounded-md p-6 mb-8">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold tracking-tight m-0">Translate Survey</h3>
-            <button className="inline-flex items-center justify-center w-8 h-8 rounded text-text-muted hover:bg-black/5 hover:text-text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed" onClick={() => setShowLangPanel(false)} disabled={translateStatus === 'processing'}>
-              <X size={16} />
-            </button>
-          </div>
-          
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-text-primary mb-2">Select Regional Languages</label>
-            <div className="flex flex-wrap gap-2 mt-2">
-              {AVAILABLE_LANGUAGES.map(lang => {
-                const isExisting = survey?.supportedLanguages?.includes(lang);
-                return (
-                  <button
-                    type="button"
-                    key={lang}
-                    onClick={() => !isExisting && toggleLanguage(lang)}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full border transition-colors capitalize ${selectedLangs.includes(lang) ? 'bg-black text-white border-black' : 'bg-white text-text-primary border-border hover:border-black'} ${isExisting ? 'opacity-50 cursor-not-allowed bg-surface border-border hover:border-border text-text-muted' : 'cursor-pointer'}`}
-                    disabled={isExisting}
-                    title={isExisting ? "Already translated" : ""}
-                  >
-                    {selectedLangs.includes(lang) && <Check size={14} />}
-                    {lang}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3">
-            <button className="inline-flex items-center justify-center gap-2 px-4 h-9 text-sm font-medium rounded-md bg-black text-white hover:bg-neutral-800 transition-colors disabled:opacity-50" onClick={handleTranslateSubmit} disabled={translateStatus === 'processing'}>
-              {translateStatus === 'processing' ? (
-                <><Loader2 size={16} className="animate-spin" /> Translating... this may take a minute</>
-              ) : (
-                <><Globe size={16} /> Start Translation</>
-              )}
-            </button>
-          </div>
-          
-
-        </div>
-      )}
 
       {/* Language Selector */}
       {survey?.supportedLanguages && survey.supportedLanguages.length > 1 && (
@@ -884,18 +1063,34 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
       )}
 
       {/* Sections List */}
-      <div className="flex flex-col gap-8">
-        {localSections.map((sec, secIdx) => (
-          <div key={secIdx} className="bg-bg border border-border rounded-md overflow-hidden shadow-sm">
+      <div className="flex flex-col">
+        {localSections.map((sec, secIdx) => {
+          const isDraggable = secIdx !== 0 && !editingSections[secIdx]; // Don't drag Demographics or editing sections
+          const isThisSectionDragging = draggedSectionIdx === secIdx;
+          const isAnySectionDragging = draggedSectionIdx !== null;
+          const isDropTarget = dropTargetIdx === secIdx;
+
+          return (
+          <div 
+            key={sec.sectionName + secIdx} 
+            className="py-4"
+            draggable={isDraggable && activeDragHandle === secIdx}
+            onDragStart={(e) => handleDragStart(e, secIdx)}
+            onDragEnd={handleDragEnd}
+            onDragOver={(e) => handleDragOver(e, secIdx)}
+            onDragEnter={(e) => handleDragEnter(e, secIdx)}
+            onDrop={(e) => handleDrop(e, secIdx)}
+          >
+            <div className={`bg-bg border rounded-md overflow-hidden shadow-sm transition-all duration-200 ${isThisSectionDragging ? 'opacity-40 border-dashed border-border scale-[0.98]' : 'border-border'} ${isDropTarget ? 'border-t-4 border-t-geist-blue' : ''}`}>
             
             {/* Section Header */}
-            <div className="flex justify-between items-center bg-surface border-b border-border px-6 py-4">
+            <div className={`flex justify-between items-center bg-surface px-6 py-4 border-b ${isThisSectionDragging ? 'border-transparent' : 'border-border'}`}>
               {isPending && editingSections[secIdx] ? (
                 <input 
                   type="text" 
                   value={sec.sectionName}
                   onChange={(e) => {
-                    const updated = [...localSections];
+                    const updated = structuredClone(localSections);
                     updated[secIdx].sectionName = e.target.value;
                     setLocalSections(updated);
                     setHasChanges(true);
@@ -904,20 +1099,54 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
                   placeholder="Section Name"
                 />
               ) : (
-                <h2 className="text-lg font-semibold tracking-tight m-0">{sec.sectionName}</h2>
+                <div className="flex items-center gap-3">
+                  {isDraggable && (
+                    <div 
+                      className="text-border hover:text-text-muted transition-colors mr-1 flex items-center justify-center cursor-grab active:cursor-grabbing"
+                      onMouseEnter={() => setActiveDragHandle(secIdx)}
+                      onMouseLeave={() => setActiveDragHandle(null)}
+                    >
+                      <GripVertical size={20} />
+                    </div>
+                  )}
+                  <h2 className="text-lg font-semibold tracking-tight m-0">{sec.sectionName}</h2>
+                  {sec.showIf && (() => {
+                    const refQ = localSections.flatMap(s => s.questions || []).find(rq => rq.qid === sec.showIf.questionId);
+                    const refOpt = refQ?.options?.find(opt => opt.id === sec.showIf.equals);
+                    const qText = refQ?.text?.english || sec.showIf.questionId;
+                    const optText = refOpt?.label?.english || sec.showIf.equals;
+                    const displayQ = qText.length > 25 ? qText.substring(0, 25) + '...' : qText;
+                    const displayOpt = optText.length > 15 ? optText.substring(0, 15) + '...' : optText;
+                    return (
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setHighlightLogic({ qid: sec.showIf.questionId, equals: sec.showIf.equals });
+                          setTimeout(() => {
+                            document.getElementById(`question-${sec.showIf.questionId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            setTimeout(() => setHighlightLogic({ qid: null, equals: null }), 3000);
+                          }, 100);
+                        }}
+                        className={`inline-flex items-center px-2 py-0.5 text-[10px] font-medium rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-700 uppercase tracking-wider transition-colors hover:bg-amber-500/20 cursor-pointer`}
+                        title={`Logic: if "${qText}" == "${optText}". Click to view.`}
+                      >
+                        Logic: if "{displayQ}" == "{displayOpt}"
+                      </button>
+                    );
+                  })()}
+                </div>
               )}
               
               {isPending && (
                 <div className="flex gap-2">
-                  {sec.sectionName === survey?.questionSections?.[secIdx]?.sectionName && sec.sectionName?.toLowerCase() !== 'demographics' && !isLogicMode && (
+                  {!isTranslationLocked && survey?.questionSections?.some(s => s.sectionName === sec.sectionName) && sec.sectionName?.toLowerCase() !== 'demographics' && (
                     <button
                       className="inline-flex items-center gap-1.5 px-2.5 h-7 text-xs font-medium rounded text-geist-blue bg-geist-blue/10 border border-geist-blue/20 hover:bg-geist-blue/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={() => {
                         setActiveImproveSection(sec.sectionName);
                         setImproveInstructions('');
                       }}
-                      disabled={isTranslationLocked || improvingStatus === 'processing' || hasLogicConfigured}
-                      title={hasLogicConfigured ? "AI Improve disabled because Skip Logic is configured" : ""}
+                      disabled={improvingStatus === 'processing'}
                     >
                       <Sparkles size={14} /> AI Improve
                     </button>
@@ -950,6 +1179,102 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
                 </div>
               )}
             </div>
+
+            {/* Section Logic Builder UI */}
+            {isLogicMode && secIdx > 0 && (
+              <div className="px-6 py-4 bg-surface-alt border-b border-border">
+                {!sec.showIf ? (
+                  <button 
+                    onClick={() => {
+                      const updated = structuredClone(localSections);
+                      updated[secIdx].showIf = { questionId: '', equals: '' };
+                      setLocalSections(updated);
+                      setHasChanges(true);
+                    }}
+                    className="text-sm font-medium text-geist-blue hover:text-blue-600 transition-colors flex items-center gap-1"
+                  >
+                    <Plus size={14} /> Add Section Skip Logic
+                  </button>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-text-primary flex items-center gap-2">
+                        <GitBranch size={14} className="text-geist-blue" />
+                        Section Display Logic
+                      </span>
+                      <button 
+                        onClick={() => {
+                          const updated = structuredClone(localSections);
+                          delete updated[secIdx].showIf;
+                          setLocalSections(updated);
+                          setHasChanges(true);
+                        }}
+                        className="text-text-muted hover:text-geist-error transition-colors"
+                        title="Remove Logic"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                    
+                    {(() => {
+                      const previousQuestions = [];
+                      for (let i = 0; i < secIdx; i++) {
+                        const sectionQuestions = localSections[i].questions;
+                        for (let j = 0; j < sectionQuestions.length; j++) {
+                          if (sectionQuestions[j].type === 'mcq' || sectionQuestions[j].type === 'checkbox') {
+                             previousQuestions.push(sectionQuestions[j]);
+                          }
+                        }
+                      }
+                      return (
+                        <div className="flex flex-wrap items-center gap-3 text-sm text-text-primary">
+                          <span>Show this entire section if</span>
+                          <select 
+                            className="h-8 px-2 bg-white border border-border rounded-md text-sm focus:outline-none focus:border-geist-blue max-w-[200px] truncate"
+                            value={sec.showIf.questionId || ''}
+                            onChange={(e) => {
+                              const updated = structuredClone(localSections);
+                              updated[secIdx].showIf.questionId = e.target.value;
+                              updated[secIdx].showIf.equals = ''; 
+                              setLocalSections(updated);
+                              setHasChanges(true);
+                            }}
+                          >
+                            <option value="" disabled>Select Previous Question</option>
+                            {previousQuestions.map(pq => (
+                              <option key={pq.qid} value={pq.qid}>
+                                {pq.text?.english?.substring(0, 40)}{pq.text?.english?.length > 40 ? '...' : ''}
+                              </option>
+                            ))}
+                          </select>
+                          
+                          <span>is</span>
+                          
+                          <select 
+                            className="h-8 px-2 bg-white border border-border rounded-md text-sm focus:outline-none focus:border-geist-blue max-w-[200px] truncate"
+                            value={sec.showIf.equals || ''}
+                            onChange={(e) => {
+                              const updated = structuredClone(localSections);
+                              updated[secIdx].showIf.equals = e.target.value;
+                              setLocalSections(updated);
+                              setHasChanges(true);
+                            }}
+                            disabled={!sec.showIf.questionId}
+                          >
+                            <option value="" disabled>Select Option</option>
+                            {sec.showIf.questionId && previousQuestions.find(pq => pq.qid === sec.showIf.questionId)?.options?.map(opt => (
+                              <option key={opt.id} value={opt.id}>
+                                {opt.label?.english}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* AI Improve Inline Panel */}
             {activeImproveSection === sec.sectionName && (
@@ -996,21 +1321,23 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
                 ))}
               </div>
             ) : (
-              <div className="px-6 py-2">
+              <div className={`px-6 transition-all duration-300 ease-in-out overflow-hidden ${isAnySectionDragging ? 'max-h-0 opacity-0 py-0' : 'max-h-[10000px] opacity-100 py-2'}`}>
                 {sec.questions.map((q, qIdx) => {
                   const isActiveAudio = playingAudioId && playingAudioId === q.audio?.[viewLang];
                   const previousQuestions = [];
+                  const allPreviousQuestions = [];
                   for (let i = 0; i <= secIdx; i++) {
                     const sectionQuestions = localSections[i].questions;
                     for (let j = 0; j < sectionQuestions.length; j++) {
                       if (i === secIdx && j >= qIdx) break;
-                      if (sectionQuestions[j].type === 'mcq' || sectionQuestions[j].type === 'checkbox') {
+                      allPreviousQuestions.push(sectionQuestions[j]);
+                      if (['mcq', 'checkbox', 'text'].includes(sectionQuestions[j].type)) {
                          previousQuestions.push(sectionQuestions[j]);
                       }
                     }
                   }
                   return (
-                <div key={q.qid} ref={isActiveAudio ? activeQuestionRef : null} className={`transition-all duration-300 ${isActiveAudio ? 'audio-glow-wrapper bg-bg shadow-sm rounded-md p-4 -mx-4 my-2 border border-transparent' : `py-4 ${qIdx === sec.questions.length - 1 ? '' : 'border-b border-border/50'}`}`}>
+                <div key={q.qid} id={`question-${q.qid}`} ref={isActiveAudio ? activeQuestionRef : null} className={`transition-all duration-300 ${isActiveAudio ? 'audio-glow-wrapper bg-bg shadow-sm rounded-md p-4 -mx-4 my-2 border border-transparent' : highlightLogic.qid === q.qid ? 'bg-amber-50 shadow-sm rounded-md p-4 -mx-4 my-2 border border-amber-200' : `py-4 ${qIdx === sec.questions.length - 1 ? '' : 'border-b border-border/50'}`}`}>
                   
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-text-muted text-xs font-bold w-8">Q{qIdx+1}.</span>
@@ -1029,33 +1356,81 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
                         {q.type}
                       </span>
                     )}
-                    {q.showIf && (
-                      <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-medium rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-700 uppercase tracking-wider">
-                        Logic: if {q.showIf.questionId} == {q.showIf.equals}
-                      </span>
-                    )}
-                    {isPending && editingSections[secIdx] && (
-                      <button 
-                        className="ml-auto text-text-muted hover:text-geist-error transition-colors"
-                        onClick={() => deleteQuestion(secIdx, qIdx)}
-                        title="Delete Question"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
+                    {q.showIf && (() => {
+                      const refQ = localSections.flatMap(s => s.questions).find(rq => rq.qid === q.showIf.questionId);
+                      const refOpt = refQ?.options?.find(opt => opt.id === q.showIf.equals);
+                      const qText = refQ?.text?.english || q.showIf.questionId;
+                      const optText = refOpt?.label?.english || q.showIf.equals;
+                      const displayQ = qText.length > 25 ? qText.substring(0, 25) + '...' : qText;
+                      const displayOpt = optText.length > 15 ? optText.substring(0, 15) + '...' : optText;
+                      const op = q.showIf.operator || '==';
+                      return (
+                        <button 
+                          onClick={() => {
+                            setHighlightLogic({ qid: q.showIf.questionId, equals: q.showIf.equals });
+                            setTimeout(() => {
+                              document.getElementById(`question-${q.showIf.questionId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                              setTimeout(() => setHighlightLogic({ qid: null, equals: null }), 3000);
+                            }, 100);
+                          }}
+                          className="inline-flex items-center px-2 py-0.5 text-[10px] font-medium rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-700 uppercase tracking-wider hover:bg-amber-500/20 transition-colors cursor-pointer"
+                          title={`Logic: if "${qText}" ${op} "${optText}". Click to view.`}
+                        >
+                          Logic: if "{displayQ}" {op} "{displayOpt}"
+                        </button>
+                      );
+                    })()}
+                    <div className="ml-auto flex items-center gap-3">
+                      {isPending && editingSections[secIdx] && secIdx !== 0 && allPreviousQuestions.length > 0 && (
+                        <div className="relative inline-block shrink-0">
+                          <select 
+                            className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
+                            title="Insert Variable"
+                            value=""
+                            onChange={(e) => {
+                              if(e.target.value) {
+                                questionInputRefs.current[`${secIdx}-${qIdx}`]?.insertVariable(e.target.value);
+                              }
+                            }}
+                          >
+                            <option value="">+ Insert Variable</option>
+                            {allPreviousQuestions.map(pq => (
+                              <option key={pq.qid} value={pq.qid}>
+                                {pq.text?.english?.substring(0, 30)}{pq.text?.english?.length > 30 ? '...' : ''}
+                              </option>
+                            ))}
+                          </select>
+                          <button className="inline-flex items-center justify-center h-7 px-2 rounded border border-border bg-surface hover:bg-surface-alt text-text-muted hover:text-geist-blue transition-colors text-[11px] font-medium pointer-events-none shadow-sm">
+                            {"{ }"} Variable
+                          </button>
+                        </div>
+                      )}
+                      {isPending && editingSections[secIdx] && (
+                        <button 
+                          className="text-text-muted hover:text-geist-error transition-colors"
+                          onClick={() => deleteQuestion(secIdx, qIdx)}
+                          title="Delete Question"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                   
                   {isPending && editingSections[secIdx] ? (
-                    <input 
-                      type="text"
-                      value={q.text?.english || ''}
-                      onChange={(e) => updateQuestionText(secIdx, qIdx, e.target.value)}
-                      className="w-full bg-transparent border border-dashed border-transparent focus:border-border hover:border-border text-text-primary text-base font-medium p-1 ml-9 outline-none transition-colors rounded-sm"
-                    />
+                    <div className="ml-9 flex items-center gap-2 w-full pr-4">
+                      <RichQuestionInput
+                        ref={(el) => { if (el) questionInputRefs.current[`${secIdx}-${qIdx}`] = el; }}
+                        value={q.text?.english || ''}
+                        onChange={(val) => updateQuestionText(secIdx, qIdx, val)}
+                        previousQuestions={secIdx !== 0 ? allPreviousQuestions : []}
+                        placeholder="Type your question..."
+                      />
+                    </div>
                   ) : (
                     <div className="ml-10 flex items-center gap-3 py-1">
                       <span className="text-base font-medium text-text-primary">
-                        {q.text?.[viewLang] || q.text?.english}
+                        {renderTemplatedText(q.text?.[viewLang] || q.text?.english, allPreviousQuestions, null)}
                       </span>
                       {q.audio && q.audio[viewLang] && q.audio[viewLang].trim() !== "" && (
                         <button onClick={() => playAudio(q.audio[viewLang])} className={`transition-colors ${playingAudioId === q.audio[viewLang] ? 'text-geist-blue hover:text-blue-600' : 'text-text-muted hover:text-text-primary'}`} title="Play audio">
@@ -1068,8 +1443,10 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
                   {/* Options */}
                   {(q.type === 'mcq' || q.type === 'checkbox') && q.options && (
                     <div className="flex flex-col gap-2 ml-10 mt-3">
-                      {q.options.map((opt, optIdx) => (
-                        <div key={opt.id} className="flex items-center gap-2">
+                      {q.options.map((opt, optIdx) => {
+                        const isHighlightedOpt = highlightLogic.qid === q.qid && highlightLogic.equals === opt.id;
+                        return (
+                        <div key={opt.id} className={`flex items-center gap-2 ${isHighlightedOpt ? 'bg-amber-100 px-2 py-1 -mx-2 rounded transition-colors duration-300' : ''}`}>
                           <div className={`w-4 h-4 border border-border shrink-0 ${q.type === 'mcq' ? 'rounded-full' : 'rounded-sm'}`} />
                           {isPending && editingSections[secIdx] ? (
                             <div className="flex flex-1 items-center gap-2">
@@ -1077,7 +1454,7 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
                                 type="text"
                                 value={opt.label?.english || ''}
                                 onChange={(e) => updateOptionText(secIdx, qIdx, optIdx, e.target.value)}
-                                className="flex-1 bg-transparent border border-dashed border-border/50 focus:border-geist-blue hover:border-border text-text-muted text-sm px-1 py-0.5 outline-none transition-colors rounded-sm"
+                                className="flex-1 bg-transparent border border-dashed border-gray-300 focus:border-geist-blue hover:border-gray-400 text-text-muted text-sm px-1 py-0.5 outline-none transition-colors rounded-sm"
                               />
                               <button onClick={() => deleteOption(secIdx, qIdx, optIdx)} className="text-text-muted hover:text-geist-error p-1 transition-colors">
                                 <X size={14} />
@@ -1087,7 +1464,7 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
                             <span className="text-text-muted text-sm">{opt.label?.[viewLang] || opt.label?.english}</span>
                           )}
                         </div>
-                      ))}
+                      )})}
                       {isPending && editingSections[secIdx] && (
                         <button 
                           onClick={() => addOption(secIdx, qIdx)}
@@ -1099,14 +1476,14 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
                     </div>
                   )}
 
-                  {/* Logic Mode Builder UI */}
-                  {isLogicMode && (
+                  {/* Logic Builder UI */}
+                  {isLogicMode && secIdx !== 0 && (
                     <div className="mt-4 p-4 bg-surface-alt border border-border rounded-md shadow-sm ml-10">
                       {!q.showIf ? (
                         <button 
                           onClick={() => {
-                            const updated = [...localSections];
-                            updated[secIdx].questions[qIdx].showIf = { questionId: '', equals: '' };
+                            const updated = structuredClone(localSections);
+                            updated[secIdx].questions[qIdx].showIf = { questionId: '', equals: '', operator: '==' };
                             setLocalSections(updated);
                             setHasChanges(true);
                           }}
@@ -1123,7 +1500,7 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
                             </span>
                             <button 
                               onClick={() => {
-                                const updated = [...localSections];
+                                const updated = structuredClone(localSections);
                                 delete updated[secIdx].questions[qIdx].showIf;
                                 setLocalSections(updated);
                                 setHasChanges(true);
@@ -1141,9 +1518,10 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
                               className="h-8 px-2 bg-white border border-border rounded-md text-sm focus:outline-none focus:border-geist-blue max-w-[200px] truncate"
                               value={q.showIf.questionId || ''}
                               onChange={(e) => {
-                                const updated = [...localSections];
+                                const updated = structuredClone(localSections);
                                 updated[secIdx].questions[qIdx].showIf.questionId = e.target.value;
                                 updated[secIdx].questions[qIdx].showIf.equals = ''; // reset option
+                                updated[secIdx].questions[qIdx].showIf.operator = '=='; // reset operator
                                 setLocalSections(updated);
                                 setHasChanges(true);
                               }}
@@ -1156,30 +1534,75 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
                               ))}
                             </select>
                             
-                            <span>is</span>
-                            
-                            <select 
-                              className="h-8 px-2 bg-white border border-border rounded-md text-sm focus:outline-none focus:border-geist-blue max-w-[200px] truncate"
-                              value={q.showIf.equals || ''}
-                              onChange={(e) => {
-                                const updated = [...localSections];
-                                updated[secIdx].questions[qIdx].showIf.equals = e.target.value;
-                                setLocalSections(updated);
-                                setHasChanges(true);
-                              }}
-                              disabled={!q.showIf.questionId}
-                            >
-                              <option value="" disabled>Select Option</option>
-                              {q.showIf.questionId && previousQuestions.find(pq => pq.qid === q.showIf.questionId)?.options?.map(opt => (
-                                <option key={opt.id} value={opt.id}>
-                                  {opt.label?.english}
-                                </option>
-                              ))}
-                            </select>
+                            {(() => {
+                              const targetQ = previousQuestions.find(pq => pq.qid === q.showIf.questionId);
+                              const isTextTarget = targetQ && targetQ.type === 'text';
+                              const operator = q.showIf.operator || '==';
+                              const val = q.showIf.equals || '';
+                              
+                              return (
+                                <>
+                                  {isTextTarget ? (
+                                    <select 
+                                      className="h-8 px-2 bg-white border border-border rounded-md text-sm focus:outline-none focus:border-geist-blue"
+                                      value={operator}
+                                      onChange={(e) => {
+                                        const updated = structuredClone(localSections);
+                                        updated[secIdx].questions[qIdx].showIf.operator = e.target.value;
+                                        setLocalSections(updated);
+                                        setHasChanges(true);
+                                      }}
+                                    >
+                                      <option value="==">Equals</option>
+                                      <option value=">">Greater Than</option>
+                                      <option value="<">Less Than</option>
+                                    </select>
+                                  ) : (
+                                    <span>is</span>
+                                  )}
+                                  
+                                  {isTextTarget ? (
+                                    <input 
+                                      type="text"
+                                      className="h-8 px-2 bg-white border border-border rounded-md text-sm focus:outline-none focus:border-geist-blue max-w-[200px]"
+                                      placeholder="Type value..."
+                                      value={val}
+                                      onChange={(e) => {
+                                        const updated = structuredClone(localSections);
+                                        updated[secIdx].questions[qIdx].showIf.equals = e.target.value;
+                                        setLocalSections(updated);
+                                        setHasChanges(true);
+                                      }}
+                                      disabled={!q.showIf.questionId}
+                                    />
+                                  ) : (
+                                    <select 
+                                      className="h-8 px-2 bg-white border border-border rounded-md text-sm focus:outline-none focus:border-geist-blue max-w-[200px] truncate"
+                                      value={val}
+                                      onChange={(e) => {
+                                        const updated = structuredClone(localSections);
+                                        updated[secIdx].questions[qIdx].showIf.equals = e.target.value;
+                                        updated[secIdx].questions[qIdx].showIf.operator = '==';
+                                        setLocalSections(updated);
+                                        setHasChanges(true);
+                                      }}
+                                      disabled={!q.showIf.questionId}
+                                    >
+                                      <option value="" disabled>Select Option</option>
+                                      {targetQ?.options?.map(opt => (
+                                        <option key={opt.id} value={opt.id}>
+                                          {opt.label?.english}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </div>
                           
                           {previousQuestions.length === 0 && (
-                            <p className="text-xs text-amber-600 mt-1">There are no previous multiple-choice questions to base logic on.</p>
+                            <p className="text-xs text-amber-600 mt-1">There are no previous questions to base logic on.</p>
                           )}
                         </div>
                       )}
@@ -1200,9 +1623,9 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
               )}
             </div>
             )}
-
+            </div>
           </div>
-        ))}
+        )})}
 
         {localSections.length === 0 && (
           <div className="flex flex-col items-center justify-center p-12 text-center bg-surface border border-dashed border-border rounded-md text-text-muted">
@@ -1210,7 +1633,7 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
           </div>
         )}
 
-        {isPending && !isLogicMode && (
+        {isPending && (
           <button 
             onClick={addSection}
             className="w-full h-14 rounded-md border-2 border-dashed border-border text-text-muted hover:border-text-primary hover:text-text-primary transition-colors flex items-center justify-center gap-2 font-medium bg-bg disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1221,6 +1644,104 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
         )}
       </div>
       </div>
+
+      {/* Dynamic Island AI Toolbar */}
+      {!loading && !error && survey && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center p-1.5 rounded-full bg-white/70 backdrop-blur-md border border-border shadow-[0_8px_30px_rgb(0,0,0,0.12)] transition-all duration-300">
+          <button 
+            className={`flex items-center justify-center h-10 px-3 rounded-full transition-all duration-300 group/btn disabled:opacity-50 ${isLogicMode ? 'bg-geist-blue/10 text-geist-blue' : 'hover:bg-black/5 text-text-primary'}`}
+            onClick={() => {
+              setIsLogicMode(!isLogicMode);
+              if (!isLogicMode) {
+                setEditingSections({});
+                toast.info("Entered Logic Mode. Structural editing is locked.");
+              } else {
+                toast.success("Exited Logic Mode");
+              }
+            }}
+            disabled={translateStatus === 'processing' || audioGenerationStatus === 'processing' || hasAudioGenerated}
+            title="Logic Mode"
+          >
+            <GitBranch size={18} className="shrink-0" />
+            <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 group-hover/btn:max-w-[120px] group-hover/btn:opacity-100 group-hover/btn:ml-2 transition-all duration-300 text-sm font-medium">
+              Logic Mode
+            </span>
+          </button>
+          
+          <div className="w-px h-5 bg-border mx-1"></div>
+
+          <button 
+            className="flex items-center justify-center h-10 px-3 rounded-full hover:bg-black/5 transition-all duration-300 group/btn disabled:opacity-50"
+            onClick={() => setShowTranslateModal(true)}
+            disabled={translateStatus === 'processing' || audioGenerationStatus === 'processing' || hasAudioGenerated}
+            title={hasAudioGenerated ? "Survey locked after audio generation" : "Translate Survey"}
+          >
+            {translateStatus === 'processing' ? <Loader2 size={18} className="text-text-primary shrink-0 animate-spin" /> : <Globe size={18} className="text-text-primary shrink-0" />}
+            <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 group-hover/btn:max-w-[120px] group-hover/btn:opacity-100 group-hover/btn:ml-2 transition-all duration-300 text-sm font-medium text-text-primary">
+              Translate
+            </span>
+          </button>
+          
+          <div className="w-px h-5 bg-border mx-1"></div>
+          
+          <button 
+            className="flex items-center justify-center h-10 px-3 rounded-full hover:bg-black/5 transition-all duration-300 group/btn disabled:opacity-50"
+            onClick={() => setShowAudioModal(true)}
+            disabled={audioGenerationStatus === 'processing' || translateStatus === 'processing' || hasAudioGenerated}
+            title={hasAudioGenerated ? "Audio already generated" : "Generate Audio"}
+          >
+            {audioGenerationStatus === 'processing' ? <Loader2 size={18} className="text-text-primary shrink-0 animate-spin" /> : <AudioLines size={18} className="text-text-primary shrink-0" />}
+            <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 group-hover/btn:max-w-[120px] group-hover/btn:opacity-100 group-hover/btn:ml-2 transition-all duration-300 text-sm font-medium text-text-primary">
+              Generate Audio
+            </span>
+          </button>
+        </div>
+      )}
+
+      {/* Translate Survey Modal */}
+      {showTranslateModal && (
+        <div className="fixed inset-0 w-screen h-screen bg-black/40 backdrop-blur-sm flex items-center justify-center z-[1000]" onClick={() => setShowTranslateModal(false)}>
+          <div className="bg-bg border border-border rounded-md shadow-lg w-full max-w-[480px] flex flex-col animate-[modalIn_0.2s_ease-out]" onClick={e => e.stopPropagation()}>
+            <div className="p-5 border-b border-border flex items-center justify-between">
+              <h2 className="text-lg font-semibold m-0 text-text-primary">Translate Survey</h2>
+              <button className="inline-flex items-center justify-center w-8 h-8 rounded text-text-muted hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-50" onClick={() => setShowTranslateModal(false)} disabled={translateStatus === 'processing'}><X size={16} /></button>
+            </div>
+            <div className="p-5">
+              <p className="m-0 text-sm text-text-secondary mb-4">
+                Select regional languages to translate the English survey into. This will run an AI translation across all sections, questions, and options.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {AVAILABLE_LANGUAGES.map(lang => {
+                  const isExisting = survey?.supportedLanguages?.includes(lang);
+                  return (
+                    <button
+                      type="button"
+                      key={lang}
+                      onClick={() => !isExisting && toggleLanguage(lang)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full border transition-colors capitalize ${selectedLangs.includes(lang) ? 'bg-black text-white border-black' : 'bg-white text-text-primary border-border hover:border-black'} ${isExisting ? 'opacity-50 cursor-not-allowed bg-surface border-border hover:border-border text-text-muted' : 'cursor-pointer'}`}
+                      disabled={isExisting}
+                      title={isExisting ? "Already translated" : ""}
+                    >
+                      {selectedLangs.includes(lang) && <Check size={14} />}
+                      {lang}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            <div className="px-5 py-3 border-t border-border bg-surface-alt rounded-b-md flex items-center justify-end gap-3">
+              <button className="inline-flex items-center justify-center px-4 h-9 text-sm font-medium rounded-md bg-white border border-border text-text-primary hover:bg-surface transition-colors disabled:opacity-50" onClick={() => setShowTranslateModal(false)} disabled={translateStatus === 'processing'}>Cancel</button>
+              <button className="inline-flex items-center justify-center gap-2 px-4 h-9 text-sm font-medium rounded-md bg-black text-white hover:bg-neutral-800 transition-colors disabled:opacity-50" onClick={handleTranslateSubmit} disabled={translateStatus === 'processing'}>
+                {translateStatus === 'processing' ? (
+                  <><Loader2 size={16} className="animate-spin" /> Translating...</>
+                ) : (
+                  <><Globe size={16} /> Translate</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Audio Generation Confirmation Modal */}
       {showAudioModal && (
@@ -1307,8 +1828,39 @@ export default function SurveyEditor({ surveyId: propSurveyId }) {
         </div>
       )}
 
+      {/* Reorder Conflict Modal */}
+      {reorderConflictModal.show && (
+        <div className="fixed inset-0 w-screen h-screen bg-black/40 backdrop-blur-sm flex items-center justify-center z-[1000]" onClick={() => setReorderConflictModal({ show: false, fromIdx: null, toIdx: null, conflicts: [], proposedSections: [] })}>
+          <div className="bg-bg border border-border rounded-md shadow-lg w-full max-w-[500px] flex flex-col animate-[modalIn_0.2s_ease-out]" onClick={e => e.stopPropagation()}>
+            <div className="p-5 border-b border-border flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-600 shrink-0">
+                <AlertCircle size={18} />
+              </div>
+              <h2 className="text-lg font-semibold m-0 text-text-primary">Logic Conflicts Detected</h2>
+            </div>
+            <div className="p-5 max-h-[60vh] overflow-y-auto">
+              <p className="m-0 text-sm text-text-secondary mb-4">
+                Moving this section will break the following skip logic rules and template variables because they reference questions that will now appear after them:
+              </p>
+              <ul className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-4 list-disc list-inside flex flex-col gap-2">
+                {reorderConflictModal.conflicts.map((conflict, i) => (
+                  <li key={i}>{conflict}</li>
+                ))}
+              </ul>
+              <p className="m-0 text-sm text-text-secondary mt-4 font-medium">
+                Do you want to proceed? Acknowledging will aggressively strip the conflicting logic and variables.
+              </p>
+            </div>
+            <div className="px-5 py-3 border-t border-border bg-surface-alt rounded-b-md flex items-center justify-end gap-3">
+              <button className="inline-flex items-center justify-center px-4 h-9 text-sm font-medium rounded-md bg-white border border-border text-text-primary hover:bg-surface transition-colors" onClick={() => setReorderConflictModal({ show: false, fromIdx: null, toIdx: null, conflicts: [], proposedSections: [] })}>Cancel (Revert Move)</button>
+              <button className="inline-flex items-center justify-center px-4 h-9 text-sm font-medium rounded-md bg-amber-600 text-white hover:bg-amber-700 transition-colors" onClick={handleAcknowledgeReorder}>Acknowledge & Clear Logic</button>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
-
+      </div>
+      
       <NotificationSidebar />
     </div>
   );
