@@ -16,8 +16,8 @@ function RootLayoutNav() {
     if (!user && inAuthGroup) {
       // Redirect to the login page if not authenticated
       router.replace('/login');
-    } else if (user && segments[0] !== '(tabs)') {
-      // Redirect to tabs if authenticated
+    } else if (user && segments[0] !== '(tabs)' && segments[0] !== 'survey') {
+      // Redirect to tabs if authenticated and not in a valid authenticated group
       router.replace('/(tabs)');
     }
   }, [user, isLoading, segments]);
@@ -34,14 +34,19 @@ function RootLayoutNav() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="login" />
       <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="survey" />
     </Stack>
   );
 }
 
+import { PrefillProvider } from '../context/PrefillContext';
+
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <RootLayoutNav />
+      <PrefillProvider>
+        <RootLayoutNav />
+      </PrefillProvider>
     </AuthProvider>
   );
 }

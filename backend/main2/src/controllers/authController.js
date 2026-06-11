@@ -29,7 +29,11 @@ async function issueTokens(res, user) {
     res.cookie("accessToken", accessToken, { ...COOKIE_OPTS, maxAge: 60 * 60 * 1000 });          // 1h
     res.cookie("refreshToken", refreshToken, { ...COOKIE_OPTS, maxAge: 7 * 24 * 60 * 60 * 1000 }); // 7d
 
-    return { accessToken, user: { userId: user._id.toString(), email: user.email, role: user.role, name: user.name } };
+    return {
+        accessToken,
+        refreshToken,
+        user: { userId: user._id.toString(), email: user.email, role: user.role, name: user.name },
+    };
 }
 
 /**
@@ -63,9 +67,14 @@ export const setupPassword = asyncHandler(async (req, res) => {
 
     user.passwordHash = await bcrypt.hash(password, 12);
     user.status = "active";
-    const { user: userData } = await issueTokens(res, user);
+    const { accessToken, refreshToken, user: userData } = await issueTokens(res, user);
 
-    return res.status(200).json({ message: "Password set successfully", user: userData });
+    return res.status(200).json({
+        message: "Password set successfully",
+        accessToken,
+        refreshToken,
+        user: userData,
+    });
 });
 
 /**
@@ -87,8 +96,13 @@ export const login = asyncHandler(async (req, res) => {
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) return res.status(401).json({ message: "Invalid credentials" });
 
-    const { user: userData } = await issueTokens(res, user);
-    return res.status(200).json({ message: "Login successful", user: userData });
+    const { accessToken, refreshToken, user: userData } = await issueTokens(res, user);
+    return res.status(200).json({
+        message: "Login successful",
+        accessToken,
+        refreshToken,
+        user: userData,
+    });
 });
 
 /**
@@ -118,7 +132,11 @@ export const refresh = asyncHandler(async (req, res) => {
     const newAccessToken = signAccessToken({ userId: user._id.toString(), email: user.email, role: user.role });
     res.cookie("accessToken", newAccessToken, { ...COOKIE_OPTS, maxAge: 60 * 60 * 1000 });
 
-    return res.status(200).json({ message: "Token refreshed" });
+    return res.status(200).json({
+        message: "Token refreshed",
+        accessToken: newAccessToken,
+        refreshToken: token,
+    });
 });
 
 /**
