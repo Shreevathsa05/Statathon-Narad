@@ -31,16 +31,29 @@ export default async function improve_english_section(surveyId, sectionName, use
 
         const current_questions = existingSection.questions;
 
-        // 3. Call Agent to revise questions
-        let revised_questions = await improve_section_agent(
-            user_instructions,
-            surveyPlan.mcp_context,
-            sectionPlan,
-            current_questions
-        );
+        // 3. Call Agent to revise questions (with up to 3 retries)
+        let revised_questions = null;
+        for (let i = 0; i < 3; i++) {
+            try {
+                revised_questions = await improve_section_agent(
+                    user_instructions,
+                    surveyPlan.mcp_context,
+                    sectionPlan,
+                    current_questions
+                );
+
+                if (Array.isArray(revised_questions)) {
+                    break; // Success, break out of retry loop
+                } else {
+                    logger.warn(`Attempt ${i + 1} failed: Agent did not return a valid array. Retrying...`);
+                }
+            } catch (err) {
+                logger.warn(`Attempt ${i + 1} encountered an error: ${err.message}. Retrying...`);
+            }
+        }
 
         if (!Array.isArray(revised_questions)) {
-            logger.error("Improvement agent did not return a valid array. Falling back to existing questions.");
+            logger.error("Improvement agent failed to return a valid array after 3 attempts. Falling back to existing questions.");
             revised_questions = current_questions;
         }
 

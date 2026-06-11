@@ -36,6 +36,7 @@ export const englishQuestionArraySchema = {
                 type: "object",
                 properties: {
                     questionId: { type: "string", description: "Target question ID" },
+                    operator: { type: "string", enum: ["==", ">", "<"], description: "Comparison operator. Use '>' or '<' only for text-based numerical comparisons." },
                     equals: { type: "string", description: "Value that triggers this question" }
                 },
                 required: ["questionId", "equals"]
@@ -80,6 +81,7 @@ export const multiLangQuestionArraySchema = {
                 type: "object",
                 properties: {
                     questionId: { type: "string", description: "Target question ID" },
+                    operator: { type: "string", enum: ["==", ">", "<"], description: "Comparison operator. Use '>' or '<' only for text-based numerical comparisons." },
                     equals: { type: "string", description: "Value that triggers this question" }
                 },
                 required: ["questionId", "equals"]

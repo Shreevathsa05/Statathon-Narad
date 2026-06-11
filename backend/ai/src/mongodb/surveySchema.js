@@ -20,6 +20,7 @@ const CHANNELS = [
 	"ivr",
 	"whatsapp",
 	"telegram",
+	"avatar"
 ];
 
 const ShowIfSchema = new mongoose.Schema(
@@ -28,10 +29,24 @@ const ShowIfSchema = new mongoose.Schema(
 			type: String,
 			required: true,
 		},
+		operator: {
+			type: String,
+			enum: ["==", ">", "<"],
+			default: "==",
+		},
 		equals: {
 			type: String,
 			required: true,
 		},
+	},
+	{ _id: false },
+);
+
+const AudioPartSchema = new mongoose.Schema(
+	{
+		type: { type: String, enum: ["text", "variable"], required: true },
+		audioId: { type: String, required: false },
+		refQid: { type: String, required: false },
 	},
 	{ _id: false },
 );
@@ -46,6 +61,11 @@ const OptionSchema = new mongoose.Schema(
 				minlength: 1,
 			},
 			required: true,
+		},
+		audio: {
+			type: Map,
+			of: String,
+			required: false,
 		},
 	},
 	{ _id: false },
@@ -78,6 +98,12 @@ const QuestionSchema = new mongoose.Schema(
 			of: {
 				type: String
 			},
+			required: false,
+		},
+
+		audioParts: {
+			type: Map,
+			of: [AudioPartSchema],
 			required: false,
 		},
 
@@ -160,8 +186,13 @@ const SurveySchema = new mongoose.Schema(
 		},
 		accessType: {
 			type: String,
-			enum: ["general", "targeted"],
-			default: "general",
+			enum: ["general", "targeted", null],
+			default: null,
+		},
+		targetSource: {
+			type: String,
+			enum: ["excel", "generated", null],
+			default: null,
 		},
 		supportedLanguages: {
 			type: [String],

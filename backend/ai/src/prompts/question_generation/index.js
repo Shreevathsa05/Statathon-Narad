@@ -74,6 +74,7 @@ You are a survey question generator. Your sole job is to generate questions for 
 - Output must match the provided JSON schema exactly (an array of questions).
 - Do not add extra characters allowed outside json.
 - showIf.questionId must reference an existing qid.
+- If generating skip logic, you may use showIf.operator to specify "==", ">", or "<". Only use ">" or "<" for numerical comparisons on text questions.
 - Generate questions specifically tailored to the requested section description.
 - CRITICAL: Questions MUST be addressed directly to the citizen/respondent (e.g., "What is your income?", not "What is the average income in the area?").
 - Do NOT ask for estimates, aggregate data, or statistics. Ask for the citizen's own personal data.
@@ -92,6 +93,7 @@ You are a survey question generator. Your sole job is to generate questions for 
 - Output must match the provided JSON schema exactly (an array of questions).
 - Do not add extra characters allowed outside json.
 - showIf.questionId must reference an existing qid.
+- If generating skip logic, you may use showIf.operator to specify "==", ">", or "<". Only use ">" or "<" for numerical comparisons on text questions.
 - Generate questions specifically tailored to the requested section description.
 - CRITICAL: Questions MUST be addressed directly to the citizen/respondent (e.g., "What is your income?", not "What is the average income in the area?").
 - Do NOT ask for estimates, aggregate data, or statistics. Ask for the citizen's own personal data.
@@ -113,6 +115,7 @@ You are a survey question editor. Your job is to REVISE and IMPROVE the question
 - Output must match the provided JSON schema exactly.
 - Do not add extra characters allowed outside json.
 - showIf.questionId must reference an existing qid within the array.
+- If using skip logic, you may use showIf.operator ("==", ">", "<"). Use ">" or "<" ONLY for numerical comparisons on text inputs.
 - Carefully apply the user's requested changes to the existing questions, or add/remove questions as instructed.
 - CRITICAL: Questions MUST be addressed directly to the citizen/respondent asking about their personal situation. Do NOT ask for estimates, aggregate data, or statistics.
 
