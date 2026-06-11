@@ -1,3 +1,4 @@
+import { baseURI } from '@/utils/constant';
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
@@ -19,10 +20,7 @@ export default function LoginScreen() {
     setError('');
 
     try {
-      console.log('Login Attempt with:', { email: email, password: password });
-
-      // Adjust the endpoint if necessary based on your API
-      const response = await fetch('http://localhost:3000/api/auth/login', {
+      const response = await fetch(baseURI + '/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -30,12 +28,12 @@ export default function LoginScreen() {
         body: JSON.stringify({ email: email, password: password }),
       });
 
-      console.log(response)
-      // If the backend sends token in JSON body, we can pass it, otherwise pass undefined to rely on cookies/interceptors
-      const user = response.data?.user;
-      const token = response.data?.token; // Might be undefined depending on backend
-
-      await login(user, token);
+      const res = await response.json();
+      if (!response.ok) {
+        throw new Error(res.message || 'Login failed');
+      }
+      
+      await login(res.user, res.accessToken, res.refreshToken);
     } catch (e: any) {
       console.log('Login Error:', e);
       setError(e.response?.data?.message || e.message || 'Login failed. Please check your credentials.');
@@ -93,8 +91,8 @@ export default function LoginScreen() {
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.skipButton} 
+        <TouchableOpacity
+          style={styles.skipButton}
           onPress={handleSkip}
           disabled={loading}
         >

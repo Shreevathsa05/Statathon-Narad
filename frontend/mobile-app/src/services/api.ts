@@ -1,6 +1,7 @@
 import * as Storage from '../utils/storage';
+import { baseURI } from '../utils/constant';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || baseURI;
 
 const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
   const token = await Storage.getItemAsync('accessToken');

@@ -1,6 +1,5 @@
-import React from 'react';
-import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { Tabs } from 'expo-router';
 
 export default function TabLayout() {
   return (
@@ -42,6 +41,38 @@ export default function TabLayout() {
           title: 'Me',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="active"
+        options={{
+          href: null,
+          title: 'Active Surveys'
+        }}
+      />
+      <Tabs.Screen
+        name="downloads"
+        options={{
+          href: null,
+          title: 'Downloaded Surveys'
+        }}
+      />
+      <Tabs.Screen
+        name="stats"
+        options={{
+          title: 'Stats',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="stats-chart-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="prefill"
+        options={{
+          title: 'Defaults',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="settings-outline" size={size} color={color} />
           ),
         }}
       />
