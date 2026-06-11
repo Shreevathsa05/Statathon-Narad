@@ -397,7 +397,7 @@ export default function SurveyPage() {
                 response.forEach((r) => {
                     if (r.answer?.isAudioBlob) {
                         formData.append(`audio_${r.qid}`, r.answer.blob, `response_${r.qid}.webm`);
-                        textResponses.push({ qid: r.qid, answer: "AUDIO_UPLOADED" });
+                        textResponses.push({ ...r, answer: "AUDIO_UPLOADED" });
                     } else {
                         textResponses.push(r);
                     }
