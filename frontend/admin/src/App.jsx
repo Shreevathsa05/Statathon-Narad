@@ -20,6 +20,7 @@ import DPDPage from './pages/dpd/DPDPage.jsx';
 import CQCDPage from './pages/cqcd/CQCDPage.jsx';
 import FieldManagerPage from './pages/field-manager/FieldManagerPage.jsx';
 import FieldAgentPage from './pages/field-agent/FieldAgentPage.jsx';
+import AnalyticsDashboard from './pages/AnalyticsDashboard.jsx';
 
 // Shell Layout
 function AppShell() {
@@ -83,6 +84,9 @@ export default function App() {
 
                 {/* CQCD Routes */}
                 <Route path="cqcd" element={<ProtectedRoute allowedRoles={['admin', 'cqcd']}><CQCDPage /></ProtectedRoute>} />
+
+                {/* Shared Analytics Route */}
+                <Route path="analytics/:surveyId" element={<ProtectedRoute allowedRoles={['admin', 'dpd', 'cqcd', 'sdrd']}><AnalyticsDashboard /></ProtectedRoute>} />
               </Route>
 
               {/* Catch-all */}
