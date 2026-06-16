@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 7s
+
+scrape_configs:
+  - job_name: "backend-1"
+    static_configs:
+      - targets: ["backend1.example.com:3000"]
+
+  - job_name: "backend-2"
+    static_configs:
+      - targets: ["backend2.example.com:3000"]
+
+  - job_name: "backend-3"
+    static_configs:
+      - targets: ["backend3.example.com:3000"]
