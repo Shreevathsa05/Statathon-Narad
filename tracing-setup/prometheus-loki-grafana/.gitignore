@@ -1,0 +1,14 @@
+# Local environment files
+.env
+
+# Generated data directories
+grafana_data/
+loki_data/
+prometheus_data/
+
+# Logs
+*.log
+
+# System files
+.DS_Store
+Thumbs.db

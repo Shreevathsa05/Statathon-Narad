@@ -1,0 +1,47 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*.tmp
+
+# Node dependencies and package managers
+node_modules/
+npm/
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build output
+dist/
+build/
+coverage/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Docker / local dev overrides
+docker-compose.override.yml
+docker-compose.*.local.yml
+
+# Tracing setup generated data
+tracing-setup/**/grafana_data/
+tracing-setup/**/loki_data/
+tracing-setup/**/prometheus_data/
+tracing-setup/**/.env
+
+# Logs
+*.log
