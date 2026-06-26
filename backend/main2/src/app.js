@@ -14,17 +14,11 @@ import { verifyJWT } from "./middleware/verifyJWT.js";
 
 const app = express();
 
-const allowedOrigins = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : [];
-const allowAllOrigins = allowedOrigins.includes('*');
 app.use(cors({
-    origin: function (origin, callback) {
-        if (!origin || allowAllOrigins || allowedOrigins.includes(origin)) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
+    origin: function(origin, callback){
+        return callback(null, true);
     },
-    credentials: true,          // Required for cookies to flow cross-origin
+    credentials: true,
 }));
 app.use(express.json());
 app.use(cookieParser());

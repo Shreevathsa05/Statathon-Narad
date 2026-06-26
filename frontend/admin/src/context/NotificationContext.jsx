@@ -51,7 +51,7 @@ export const NotificationProvider = ({ children }) => {
     fetchInitialNotifications();
 
     // Establish SSE Connection with credentials so it sends the JWT cookie
-    const eventSource = new EventSource(`http://localhost:3000/api/notifications/stream`, { withCredentials: true });
+    const eventSource = new EventSource(`/api/notifications/stream`, { withCredentials: true });
 
     eventSource.onmessage = (event) => {
       // The server sends a heartbeat 'connected' event first

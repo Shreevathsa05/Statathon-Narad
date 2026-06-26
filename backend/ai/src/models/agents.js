@@ -2,9 +2,9 @@
 import { llm_chat, langfuseHandler } from "./llms.js";
 import { mcp_tools } from "../tools/multi_mcp_client.js";
 import { createAgent } from "langchain";
-import { 
-    context_collector_system_prompt, 
-    section_planner_system_prompt, 
+import {
+    context_collector_system_prompt,
+    section_planner_system_prompt,
     question_generator_system_prompt,
     improve_section_system_prompt_english,
     multilang_translator_system_prompt,
@@ -35,10 +35,10 @@ export async function context_collector_agent(user_input, surveyId) {
                 content: `${context_collector_system_prompt}\n${user_input}`
             }
         ]
-    }, { 
+    }, {
         recursionLimit: 30,
-        callbacks: [langfuseHandler]
     });
+    // callbacks: [langfuseHandler]
 
     const final = getFinalMessage(res.messages);
     pushLog(surveyId, "Context Collector Agent Completed");
@@ -52,7 +52,7 @@ function getFinalMessage(messages) {
 // section planner agent
 export async function section_planner_agent(user_input, context_extracted, surveyId) {
     pushLog(surveyId, "Section Planner Agent Started");
-    
+
     const planner = createAgent({
         model: llm_chat,
         tools: mcp_tools,
@@ -66,15 +66,15 @@ export async function section_planner_agent(user_input, context_extracted, surve
                 content: `${section_planner_system_prompt}\n\nUser Input: ${user_input}\nContext Extracted: ${context_extracted}`
             }
         ]
-    }, { 
+    }, {
         recursionLimit: 30,
         callbacks: [langfuseHandler]
     });
 
     pushLog(surveyId, "Section Planner Agent Completed");
-    
+
     let content = getFinalMessage(res.messages);
-    
+
     console.log("=== RAW PLANNER RESPONSE ===");
     console.log(content);
     console.log("============================");
@@ -118,15 +118,15 @@ export async function question_generator_agent(user_input, context_summarized, s
                 content: `${question_generator_system_prompt}\n\nTopic: ${user_input}\nMOSPI extracted Context: ${context_summarized}\n\nSection to Generate: ${JSON.stringify(section, null, 2)}\n\nPreviously Generated Questions (DO NOT REPEAT THESE):\n${JSON.stringify(previous_questions, null, 2)}`
             }
         ]
-    }, { 
+    }, {
         recursionLimit: 30,
         callbacks: [langfuseHandler]
     });
 
     pushLog(surveyId, `Question Generator Agent Completed for section: ${section.sectionName}`);
-    
+
     let content = getFinalMessage(res.messages);
-    
+
     console.log(`=== RAW QUESTION GENERATOR RESPONSE [${section.sectionName}] ===`);
     console.log(content);
     console.log("=============================================");
@@ -170,15 +170,15 @@ export async function improve_section_agent(user_instructions, context_summarize
                 content: `${improve_section_system_prompt_english}\n\nMOSPI extracted Context: ${context_summarized}\n\nSection Description: ${JSON.stringify(section, null, 2)}\n\nExisting Questions:\n${JSON.stringify(current_questions, null, 2)}\n\nUser Instructions for Improvement:\n${user_instructions}`
             }
         ]
-    }, { 
+    }, {
         recursionLimit: 30,
         callbacks: [langfuseHandler]
     });
 
     console.log(`Improve Section Agent Completed for section: ${section.sectionName}`);
-    
+
     let content = getFinalMessage(res.messages);
-    
+
     console.log(`=== RAW IMPROVE SECTION RESPONSE [${section.sectionName}] ===`);
     console.log(content);
     console.log("=========================================================");
@@ -222,15 +222,15 @@ export async function multilang_translator_agent(question, target_languages, sur
                 content: `${multilang_translator_system_prompt}\n\nTarget Languages: ${target_languages.join(", ")}\n\nQuestion to translate:\n${JSON.stringify(question, null, 2)}`
             }
         ]
-    }, { 
+    }, {
         recursionLimit: 30,
         callbacks: [langfuseHandler]
     });
 
     pushLog(surveyId, `Multilang Translator Agent Completed.`);
-    
+
     let content = getFinalMessage(res.messages);
-    
+
     pushLog(surveyId, `=== RAW MULTILANG TRANSLATOR RESPONSE ===`);
     pushLog(surveyId, content);
     pushLog(surveyId, "=========================================");
@@ -260,26 +260,26 @@ export async function prompt_validation_agent(user_input) {
 
     const res = await validator.invoke({
         messages: [
-        {
-            role: "user",
-            content: `${prompt_validation_system_prompt}\n\nUser Input: ${user_input}`
-        }
+            {
+                role: "user",
+                content: `${prompt_validation_system_prompt}\n\nUser Input: ${user_input}`
+            }
         ]
-    }, { 
+    }, {
         recursionLimit: 30,
         callbacks: [langfuseHandler]
     });
 
-        console.log(`Prompt Validation Agent Completed.`);
-        
+    console.log(`Prompt Validation Agent Completed.`);
+
     let content = getFinalMessage(res.messages);
-        
-        console.log(`=== RAW PROMPT VALIDATOR RESPONSE ===`);
-        console.log(content);
-        console.log("=========================================");
+
+    console.log(`=== RAW PROMPT VALIDATOR RESPONSE ===`);
+    console.log(content);
+    console.log("=========================================");
 
     if (typeof content === "string") {
-            content = content.replace(/```json/gi, "").replace(/```/g, "").trim();
+        content = content.replace(/```json/gi, "").replace(/```/g, "").trim();
         try {
             return JSON.parse(content);
         } catch (e) {

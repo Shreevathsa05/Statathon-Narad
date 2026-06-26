@@ -10,7 +10,7 @@ export default defineConfig({
     port: 5174,
     proxy: {
       '/speech': {
-        target: 'http://localhost:3001',
+        target: process.env.VITE_AI_URL || 'http://localhost:3001',
         changeOrigin: true,
       }
     }
