@@ -1,10 +1,32 @@
 # NARAD — National Automated Response and Data System
 
-> **NARAD** is a state-of-the-art, multi-modal survey platform developed for the **Ministry of Statistics and Programme Implementation (MoSPI)**, Government of India. The platform digitally mirrors the existing National Statistical System (NSS) division model to automate the generation, delivery, ingestion, and validation of socio-economic and enterprise surveys across India.
+> 🏆 **Top 5 National Finalist**
+>
+> **MoSPI × Ministry of Education Statathon 2025**
+>
+> Selected among the **Top 5 finalist teams nationwide** in the Government of India's Statathon 2025 (organized by MoSPI & Ministry of Education) for developing an AI-powered intelligent survey platform for next-generation national statistical data collection.
+
+![Top 5 National Finalist](https://img.shields.io/badge/🏆-Top%205%20National%20Finalist-gold)
+![MoSPI Statathon](https://img.shields.io/badge/MoSPI-Statathon%202025-blue)
+![Government of India](https://img.shields.io/badge/Government-India-success)
+![AI Survey Platform](https://img.shields.io/badge/AI-Multi--Agent-orange)
+
+---
+
+## 🏅 Highlights
+
+- 🏆 **Top 5 National Finalist** — MoSPI × Ministry of Education Statathon 2025
+- 🇮🇳 Developed for Government of India's national statistical survey modernization initiative
+- 🤖 Multi-agent AI architecture using LangGraph
+- 🌐 Multi-channel data collection (Web, Telegram, IVR, Voice)
+- 🗣️ Multilingual survey generation and speech processing
+- 📊 Adaptive questionnaires with dynamic branching
+- ⚡ Low-latency asynchronous processing pipeline
 
 ---
 
 ## 🗺️ High-Level Multi-Channel Data Flow
+
 
 This diagram illustrates how surveys are generated asynchronously by the AI system (grounded in MoSPI datasets) and delivered across online and on-ground channels, with responses being stored centrally and auto-coded.
 
