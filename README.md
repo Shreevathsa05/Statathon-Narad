@@ -250,14 +250,14 @@ stateDiagram-v2
     state GetPhone {
         [*] --> InputPhone: Awaiting 10-digit number
         InputPhone --> GetOTP: Validated 10 digits
-        InputPhone --> GetPhone: Invalid input
+        InputPhone --> InputPhone: Invalid input
     }
     
     state GetOTP {
         [*] --> SendTelegramOTP: Generate 6-digit code
         SendTelegramOTP --> VerifyOTP: Awaiting user input
         VerifyOTP --> QuestionLoop: Valid OTP code
-        VerifyOTP --> GetOTP: Invalid OTP code
+        VerifyOTP --> VerifyOTP: Invalid OTP code
     }
 
     state QuestionLoop {
