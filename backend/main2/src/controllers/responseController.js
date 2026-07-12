@@ -180,7 +180,7 @@ export const getAllSurveyResponseBySurveyId = asyncHandler(async (req, res) => {
         throw new ApiError(404, "Survey not found");
     }
 
-    const surveyResponse = await SurveyResponse.find({ surveyId: survey_id });
+    const surveyResponse = await SurveyResponse.find({ surveyId: survey._id });
 
     return res.status(200).json(
         new ApiResponse(200, surveyResponse, "successfully fetched survey response")

@@ -25,10 +25,84 @@ const flattenQuestions = (surveyData) => {
 // Helper to evaluate branching logic
 const evaluateShowIf = (question, responses) => {
     if (!question.showIf) return true;
-    const { questionId, equals } = question.showIf;
-    const parentResponse = responses.find(r => r.qid === questionId);
-    if (!parentResponse) return false;
-    return parentResponse.answer === equals;
+    
+    const { questionId, equals, operator = "==" } = question.showIf;
+    
+    const answersMap = responses.reduce((acc, curr) => {
+        acc[curr.qid] = curr.answer;
+        return acc;
+    }, {});
+
+    const answerValue = answersMap[questionId];
+
+    if (answerValue === undefined || answerValue === null || answerValue === "") {
+        return false;
+    }
+
+    if (operator === ">") {
+        return Number(answerValue) > Number(equals);
+    } else if (operator === "<") {
+        return Number(answerValue) < Number(equals);
+    } else {
+        const targetVal = String(equals).toLowerCase();
+        if (Array.isArray(answerValue)) {
+            return answerValue.some(v => String(v).toLowerCase() === targetVal);
+        }
+        return String(answerValue).toLowerCase() === targetVal;
+    }
+};
+
+// Helper to generate TwiML for playing audio, supporting dynamic stitching
+const generateAudioTwiML = (question, session, questions) => {
+    let audioId = question.audio && question.audio[session.language];
+    if (audioId && audioId.get) audioId = audioId.get(session.language);
+    else if (question.audio && question.audio instanceof Map) audioId = question.audio.get(session.language);
+
+    let twimlPieces = [];
+
+    if (audioId === "stitched") {
+        let parts = question.audioParts && question.audioParts[session.language];
+        if (parts && parts.get) parts = parts.get(session.language);
+        else if (question.audioParts && question.audioParts instanceof Map) parts = question.audioParts.get(session.language);
+
+        if (parts && Array.isArray(parts)) {
+            parts.forEach((part, index) => {
+                if (part.type === "text" && part.audioId) {
+                    const url = `${process.env.NGROK_URL}/api/survey/proxy-audio?surveyId=${session.surveyId}&amp;audioId=${part.audioId}&amp;cb=${Date.now()}`;
+                    twimlPieces.push(`<Play>${url}</Play>`);
+                } else if (part.type === "variable" && part.refQid) {
+                    const refResponse = session.responses.find(r => r.qid === part.refQid);
+                    if (refResponse && refResponse.answer) {
+                        const refQ = questions.find(q => q.qid === part.refQid);
+                        if (refQ && refQ.options) {
+                            const ansArray = Array.isArray(refResponse.answer) ? refResponse.answer : [refResponse.answer];
+                            ansArray.forEach(ansVal => {
+                                const opt = refQ.options.find(o => o.id === ansVal);
+                                let optAudioId = opt && opt.audio && opt.audio[session.language];
+                                if (optAudioId && optAudioId.get) optAudioId = optAudioId.get(session.language);
+                                
+                                if (optAudioId) {
+                                    const url = `${process.env.NGROK_URL}/api/survey/proxy-audio?surveyId=${session.surveyId}&amp;audioId=${optAudioId}&amp;cb=${Date.now()}`;
+                                    twimlPieces.push(`<Play>${url}</Play>`);
+                                }
+                            });
+                        }
+                    }
+                }
+                
+                if (index < parts.length - 1) {
+                    twimlPieces.push(`<Pause length="0.2"/>`);
+                }
+            });
+        }
+    } 
+    
+    if (twimlPieces.length === 0 && audioId && audioId !== "stitched") {
+        const url = `${process.env.NGROK_URL}/api/survey/proxy-audio?surveyId=${session.surveyId}&amp;audioId=${audioId}&amp;cb=${Date.now()}`;
+        twimlPieces.push(`<Play>${url}</Play>`);
+    }
+
+    return twimlPieces.join('\n        ');
 };
 
 // Helper to find the next valid question
@@ -151,21 +225,17 @@ export const handleCallConnect = (req, res) => {
   }
 
   session.currentQIndex = firstQIndex;
+  session.questionStartTime = Date.now();
   
   const question = questions[firstQIndex];
-  let audioFileId = question.audio && question.audio[session.language]; 
-  if (audioFileId && audioFileId.get) audioFileId = audioFileId.get(session.language); // Map handling
-  else if (question.audio && question.audio instanceof Map) audioFileId = question.audio.get(session.language);
-  
-  // Proxy URL (ampersand must be escaped for valid XML)
-  const audioUrl = `${process.env.NGROK_URL}/api/survey/proxy-audio?surveyId=${session.surveyId}&amp;audioId=${audioFileId}&amp;cb=${Date.now()}`;
+  const playTags = generateAudioTwiML(question, session, questions);
 
   const recordingActionUrl = `${process.env.NGROK_URL}/api/survey/webhook/answer`;
 
   const twiml = `<?xml version="1.0" encoding="UTF-8"?>
     <Response>
         <Pause length="1"/>
-        <Play>${audioUrl}</Play>
+        ${playTags}
         <Record action="${recordingActionUrl}" maxLength="60" />
     </Response>`;
 
@@ -232,15 +302,14 @@ export const handleAnswer = async (req, res) => {
         session.retryCount += 1;
         
         const invalidAudioUrl = `${process.env.NGROK_URL}/audio/invalid_response.mp3?cb=${Date.now()}`;
-        let qAudioId = currentQ.audio && currentQ.audio[session.language];
-        if (currentQ.audio && currentQ.audio.get) qAudioId = currentQ.audio.get(session.language);
-        const qAudioUrl = `${process.env.NGROK_URL}/api/survey/proxy-audio?surveyId=${session.surveyId}&amp;audioId=${qAudioId}&amp;cb=${Date.now()}`;
+        const playTags = generateAudioTwiML(currentQ, session, questions);
+        session.questionStartTime = Date.now(); // Reset timer for retry
 
         const twiml = `<?xml version="1.0" encoding="UTF-8"?>
         <Response>
             <Pause length="1"/>
             <Play>${invalidAudioUrl}</Play>
-            <Play>${qAudioUrl}</Play>
+            ${playTags}
             <Record action="${process.env.NGROK_URL}/api/survey/webhook/answer" maxLength="60" />
         </Response>`;
 
@@ -253,22 +322,27 @@ export const handleAnswer = async (req, res) => {
        finalAnswer = null; 
     }
 
-    session.responses.push({ qid: currentQ.qid, answer: finalAnswer });
+    const timeTaken = (Date.now() - (session.questionStartTime || Date.now())) / 1000;
+    session.responses.push({ 
+        qid: currentQ.qid, 
+        answer: finalAnswer,
+        timeTaken,
+        timestamp: new Date().toISOString()
+    });
     session.retryCount = 0; 
 
     const nextQIndex = getNextQuestionIndex(questions, session.currentQIndex, session.responses);
 
     if (nextQIndex !== -1) {
         session.currentQIndex = nextQIndex;
+        session.questionStartTime = Date.now();
         const nextQ = questions[nextQIndex];
-        let nextAudioId = nextQ.audio && nextQ.audio[session.language];
-        if (nextQ.audio && nextQ.audio.get) nextAudioId = nextQ.audio.get(session.language);
-        const nextAudioUrl = `${process.env.NGROK_URL}/api/survey/proxy-audio?surveyId=${session.surveyId}&amp;audioId=${nextAudioId}&amp;cb=${Date.now()}`;
+        const playTags = generateAudioTwiML(nextQ, session, questions);
 
         const twiml = `<?xml version="1.0" encoding="UTF-8"?>
         <Response>
             <Pause length="1"/>
-            <Play>${nextAudioUrl}</Play>
+            ${playTags}
             <Record action="${process.env.NGROK_URL}/api/survey/webhook/answer" maxLength="60" />
         </Response>`;
 
