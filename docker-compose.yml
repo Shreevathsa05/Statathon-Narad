@@ -1,5 +1,5 @@
 version: '3.8'
-name: "start backend"
+name: "start stack"
 services:
   main2:
     build:
@@ -11,6 +11,10 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
+      - AI_SERVER_URL=http://ai:3000
+      - MINIO_ENDPOINT=minio
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
     env_file:
       - ./backend/main2/.env
     networks:
@@ -33,6 +37,9 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
+      - MINIO_ENDPOINT=minio
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
     env_file:
       - ./backend/ai/.env
     networks:
@@ -45,7 +52,55 @@ services:
       retries: 3
       start_period: 5s
 
+  admin:
+    build:
+      context: ./frontend/admin
+      dockerfile: Dockerfile
+    container_name: statathon-admin
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_BACKEND_URL=http://main2:3000
+      - VITE_AI_URL=http://ai:3000
+    networks:
+      - statathon-network
+    restart: unless-stopped
+    depends_on:
+      - main2
+      - ai
 
+  citizen:
+    build:
+      context: ./frontend/citizen
+      dockerfile: Dockerfile
+    container_name: statathon-citizen
+    ports:
+      - "5174:5173"
+    environment:
+      - VITE_AI_URL=http://ai:3000
+      - VITE_API_URL=http://localhost:3000/api
+    networks:
+      - statathon-network
+    restart: unless-stopped
+    depends_on:
+      - main2
+      - ai
+
+  minio:
+    image: minio/minio:latest
+    container_name: statathon-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - statathon-network
+    restart: unless-stopped
 
 networks:
   statathon-network:
@@ -55,4 +110,6 @@ volumes:
   mongodb_data:
     driver: local
   mongodb_config:
+    driver: local
+  minio_data:
     driver: local
